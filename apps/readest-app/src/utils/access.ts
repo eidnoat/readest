@@ -18,203 +18,78 @@ interface Token {
   [key: string]: string | number | boolean;
 }
 
-export const getSubscriptionPlan = (token: string): UserPlan => {
-  const data = jwtDecode<Token>(token) || {};
-  return data['plan'] || 'free';
+export const getSubscriptionPlan = (_token?: string): UserPlan => {
+  return 'pro';
 };
 
-export const getUserProfilePlan = (token: string): UserPlan => {
-  const data = jwtDecode<Token>(token) || {};
-  let plan = data['plan'] || 'free';
-  if (plan === 'free') {
-    const purchasedQuota = data['storage_purchased_bytes'] || 0;
-    if (purchasedQuota > 0) {
-      plan = 'purchase';
-    }
-  }
-  return plan;
+export const getUserProfilePlan = (_token?: string): UserPlan => {
+  return 'pro';
 };
 
-/**
- * Plans that include the "Send to Readest via email" feature: Plus,
- * Pro, and Lifetime (`purchase`). Free users see an upgrade card on
- * the client and get a 403 from the server endpoints that allocate /
- * rotate the address, plus a bounce from the inbound email Worker.
- *
- * Other Send channels (in-app `/send` page, mobile share-sheet, browser
- * extension) stay open to free users — the gate is the personal email
- * inbox only.
- */
-export const EMAIL_IN_PLANS: readonly UserPlan[] = ['plus', 'pro', 'purchase'];
+export const EMAIL_IN_PLANS: readonly UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
 
-export const isEmailInPlan = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  isCustomizationAllowed(plan, customizationPurchased);
+export const isEmailInPlan = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean => true;
 
-/**
- * Plans that include third-party cloud sync (WebDAV / Google Drive): any paid
- * plan — Plus, Pro, and Lifetime (`purchase`). Free users see an upgrade prompt
- * in Settings and the reader's auto-sync stays off, so syncing to a personal
- * cloud is a premium feature.
- */
-export const CLOUD_SYNC_PLANS: readonly UserPlan[] = ['plus', 'pro', 'purchase'];
+export const CLOUD_SYNC_PLANS: readonly UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
 
-export const isCloudSyncInPlan = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  isCustomizationAllowed(plan, customizationPurchased);
+export const isCloudSyncInPlan = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean =>
+  true;
 
-/**
- * Master switch for the third-party cloud-sync premium paywall. ON: cloud
- * sync (WebDAV / Google Drive / S3) requires a {@link CLOUD_SYNC_PLANS} plan —
- * free users see the provider rows with a Premium badge and an upgrade route
- * instead of the config sub-pages, and a downgraded account's still-selected
- * provider is paused (never a silent fallback to Readest Cloud uploads, #4959).
- * Every gate goes through {@link isCloudSyncAllowed}, so this flag is the
- * whole toggle.
- */
-export const CLOUD_SYNC_REQUIRES_PREMIUM = true;
+export const CLOUD_SYNC_REQUIRES_PREMIUM = false;
 
-/**
- * Whether third-party cloud sync is available for a plan. Falls back to the
- * {@link isCloudSyncInPlan} paywall while {@link CLOUD_SYNC_REQUIRES_PREMIUM}
- * is on; flipping the switch off ungates every plan.
- */
-export const isCloudSyncAllowed = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  !CLOUD_SYNC_REQUIRES_PREMIUM || isCloudSyncInPlan(plan, customizationPurchased);
+export const isCloudSyncAllowed = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean =>
+  true;
 
-/**
- * Plans that include the offline TTS audio cache — pre-downloading a book's
- * Read Aloud audio per chapter so it plays without a network: any paid plan
- * (Plus, Pro, and Lifetime `purchase`). Free users see the download row with a
- * Premium badge and an upgrade route instead of the per-chapter controls.
- */
-export const TTS_CACHE_PLANS: readonly UserPlan[] = ['plus', 'pro', 'purchase'];
+export const TTS_CACHE_PLANS: readonly UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
 
-export const isTTSCacheInPlan = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  isCustomizationAllowed(plan, customizationPurchased);
+export const isTTSCacheInPlan = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean =>
+  true;
 
-/**
- * Master switch for the offline-audio premium paywall, mirroring
- * {@link CLOUD_SYNC_REQUIRES_PREMIUM}. ON: pre-downloading TTS audio requires a
- * {@link TTS_CACHE_PLANS} plan. Flipping it off ungates every plan. The
- * automatic playback cache (audio kept as the user listens) is unaffected —
- * only the explicit download UI is gated.
- */
-export const TTS_CACHE_REQUIRES_PREMIUM = true;
+export const TTS_CACHE_REQUIRES_PREMIUM = false;
 
-export const isTTSCacheAllowed = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  !TTS_CACHE_REQUIRES_PREMIUM || isTTSCacheInPlan(plan, customizationPurchased);
+export const isTTSCacheAllowed = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean =>
+  true;
 
-/**
- * Offline Audiobookshelf downloads — storing an ABS audiobook's tracks or an
- * ebook-only item's file on the device so it plays and reads without a
- * network — are a premium feature ({@link isCustomizationAllowed}). Free users
- * see the action with a Premium badge and an upgrade route; streaming stays
- * free. Client-side gate, like the TTS cache.
- */
-export const isAbsOfflineInPlan = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  isCustomizationAllowed(plan, customizationPurchased);
+export const isAbsOfflineInPlan = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean =>
+  true;
 
-/**
- * Master switch for the offline-download paywall, mirroring
- * {@link TTS_CACHE_REQUIRES_PREMIUM}. Flipping it off ungates every plan.
- */
-export const ABS_OFFLINE_REQUIRES_PREMIUM = true;
+export const ABS_OFFLINE_REQUIRES_PREMIUM = false;
 
-export const isAbsOfflineAllowed = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  !ABS_OFFLINE_REQUIRES_PREMIUM || isAbsOfflineInPlan(plan, customizationPurchased);
+export const isAbsOfflineAllowed = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean =>
+  true;
 
-/**
- * Master switch for the Anki paywall: sending words to AnkiDroid, importing a
- * deck back, and the Anki file export are premium ({@link isCustomizationAllowed}).
- * CSV export stays free. Client-side gate, like the TTS cache. Flipping it off
- * ungates every plan.
- */
-export const ANKI_REQUIRES_PREMIUM = true;
+export const ANKI_REQUIRES_PREMIUM = false;
 
-export const isAnkiAllowed = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  !ANKI_REQUIRES_PREMIUM || isCustomizationAllowed(plan, customizationPurchased);
+export const isAnkiAllowed = (_plan?: UserPlan, _customizationPurchased?: boolean): boolean => true;
 
-/**
- * Plans that include Nearby BookDrop device pairing — trusted devices whose
- * drops skip the per-transfer confirmation dialog: any paid plan (Plus, Pro,
- * and Lifetime `purchase`). Free users see the pairing affordance with a
- * Premium badge and an upgrade route; plain confirm-every-time transfers stay
- * free. This gate is client-side only (LAN transfers have no server in the
- * path), matching the TTS-cache gate's trust level.
- */
-export const NEARBY_PAIRING_PLANS: readonly UserPlan[] = ['plus', 'pro', 'purchase'];
+export const NEARBY_PAIRING_PLANS: readonly UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
 
-export const isNearbyPairingInPlan = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  isCustomizationAllowed(plan, customizationPurchased);
+export const isNearbyPairingInPlan = (
+  _plan?: UserPlan,
+  _customizationPurchased?: boolean,
+): boolean => true;
 
-/**
- * Master switch for the pairing paywall, mirroring
- * {@link CLOUD_SYNC_REQUIRES_PREMIUM}. ON: pairing (and therefore
- * confirmation-free drops) requires a {@link NEARBY_PAIRING_PLANS} plan.
- * Flipping it off ungates every plan. Existing pairing records always
- * persist; only the auto-accept behavior is gated.
- */
-export const NEARBY_PAIRING_REQUIRES_PREMIUM = true;
+export const NEARBY_PAIRING_REQUIRES_PREMIUM = false;
 
-export const isNearbyPairingAllowed = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  !NEARBY_PAIRING_REQUIRES_PREMIUM || isNearbyPairingInPlan(plan, customizationPurchased);
+export const isNearbyPairingAllowed = (
+  _plan?: UserPlan,
+  _customizationPurchased?: boolean,
+): boolean => true;
 
-/**
- * Whether the account has bought the Full Customization unlock, as minted into
- * the access token by `custom_access_token_hook`. Absent on tokens issued
- * before the claim existed, which reads as not purchased.
- */
-export const getCustomizationPurchased = (token: string): boolean => {
-  const data = jwtDecode<Token>(token) || {};
-  return data['customization_purchased'] === true;
-};
+export const getCustomizationPurchased = (_token?: string): boolean => true;
 
-/**
- * Plans that carry the premium feature set without a separate purchase.
- *
- * `purchase` is deliberately absent. {@link getUserProfilePlan} reports it for
- * anyone holding ANY one-time purchase, which is how a storage add-on
- * presents, so including it would hand every premium feature to a buyer who
- * only wanted more space.
- */
-export const PREMIUM_PLANS: readonly UserPlan[] = ['plus', 'pro'];
+export const PREMIUM_PLANS: readonly UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
 
-/**
- * Self-hosted deployments unlock every premium feature, signed in or not.
- * There is no store to buy from, and the operator already runs the
- * infrastructure the paywall exists to fund. Read from the runtime config in
- * the browser, and straight from the environment on the server where the
- * window-injected config does not exist.
- */
-export const isSelfHosted = (): boolean =>
-  getRuntimeConfig()?.selfHosted === true ||
-  // `??` would stop at an empty string, so an explicitly blank SELF_HOSTED
-  // would mask NEXT_PUBLIC_SELF_HOSTED. `||` falls through on empty too.
-  (process.env['SELF_HOSTED'] || process.env['NEXT_PUBLIC_SELF_HOSTED']) === 'true';
+export const isSelfHosted = (): boolean => true;
 
-/**
- * The single gate for premium features: a self-hosted deployment, a paid
- * subscription, or the Full Customization unlock bought outright.
- */
-export const isCustomizationAllowed = (plan: UserPlan, customizationPurchased: boolean): boolean =>
-  isSelfHosted() || customizationPurchased || PREMIUM_PLANS.includes(plan);
+export const isCustomizationAllowed = (
+  _plan?: UserPlan,
+  _customizationPurchased?: boolean,
+): boolean => true;
 
-/**
- * Custom translators (the user's own OpenAI-compatible LLM or DeepL key) are a
- * premium feature. Requests go straight from the device, so this is a
- * client-side gate, like the TTS cache. It reads the session token directly so
- * a reader window never sees a premium user as free while the plan loads.
- */
-export const isCustomTranslatorAllowed = (token: string | null | undefined): boolean =>
-  token
-    ? isCustomizationAllowed(getUserProfilePlan(token), getCustomizationPurchased(token))
-    : isSelfHosted();
+export const isCustomTranslatorAllowed = (_token?: string | null | undefined): boolean => true;
 
-/**
- * Custom TTS services (the user's own OpenAI-compatible speech endpoint) are
- * premium on the same terms as custom translators: requests go straight from
- * the device, so this is a client-side gate.
- */
-export const isCustomTTSAllowed = isCustomTranslatorAllowed;
+export const isCustomTTSAllowed = (_token?: string | null | undefined): boolean => true;
 
 export const STORAGE_QUOTA_GRACE_BYTES = 10 * 1024 * 1024; // 10 MB grace
 
@@ -251,13 +126,12 @@ export const getTranslationQuota = (plan: UserPlan): number => {
  * this deliberately excludes `purchase` (lifetime): synthesis has a recurring
  * per-character GPU cost that a one-time purchase does not fund.
  */
-export const TTS_PLANS: readonly UserPlan[] = ['plus', 'pro'];
+export const TTS_PLANS: readonly UserPlan[] = ['free', 'plus', 'pro', 'purchase'];
 
-export const isTTSInPlan = (plan: UserPlan): boolean => TTS_PLANS.includes(plan);
+export const isTTSInPlan = (_plan?: UserPlan): boolean => true;
 
 /** A Readest Voice tier: Plus unlocks its voices, Pro unlocks both tiers. */
-export const isVoiceTierInPlan = (tier: 'plus' | 'pro', plan: UserPlan): boolean =>
-  tier === 'plus' ? isTTSInPlan(plan) : plan === 'pro';
+export const isVoiceTierInPlan = (_tier: 'plus' | 'pro', _plan?: UserPlan): boolean => true;
 
 export const getTTSQuota = (plan: UserPlan): number => {
   const fixedQuota = parseInt(process.env['TTS_FIXED_QUOTA'] ?? '0');

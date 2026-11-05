@@ -21,14 +21,6 @@ import { useEinkMode } from '@/hooks/useEinkMode';
 import { getLocale } from '@/utils/misc';
 import { getDirFromUILanguage } from '@/utils/rtl';
 import { getAndroidPatchedViewportContent } from '@/utils/viewport';
-import {
-  getTelemetryDecision,
-  optInTelemetry,
-  optOutTelemetry,
-  reconcileTelemetryConsent,
-  rollIntoTelemetryPromptBucket,
-  setTelemetryDecision,
-} from '@/utils/telemetry';
 import { getLibraryViewSettings } from '@/helpers/settings';
 import { SETTINGS_FILENAME } from '@/services/constants';
 import type { AppService } from '@/types/system';
@@ -58,54 +50,13 @@ import { initSettingsSync } from '@/services/sync/replicaSettingsSync';
 const finalizeTelemetryDecision = ({
   appService,
   settings,
-  isNewUser,
-  onShowPrompt,
 }: {
   appService: AppService;
   settings: SystemSettings;
   isNewUser: boolean;
   onShowPrompt: () => void;
 }) => {
-  const existing = getTelemetryDecision();
-  if (existing === 'pending') {
-    onShowPrompt();
-    return;
-  }
-  if (existing !== null) {
-    // The decision is recorded. PostHog's consent can still drift from the
-    // settings file (a command-palette toggle, another window, or an edited
-    // settings file), so line the two up on every boot (issue #6422).
-    const telemetryEnabled = reconcileTelemetryConsent(settings.telemetryEnabled);
-    if (settings.telemetryEnabled !== telemetryEnabled) {
-      // A recorded opt-out wins over a stale `true` in the file. Save it so
-      // the settings switch shows telemetry as off.
-      settings.telemetryEnabled = telemetryEnabled;
-      void appService.saveSettings(settings);
-    }
-    return;
-  }
-
-  if (!isNewUser) {
-    // Existing user: keep their saved preference and record the decision so
-    // we stop checking.
-    if (settings.telemetryEnabled) {
-      optInTelemetry();
-    } else {
-      optOutTelemetry();
-    }
-    return;
-  }
-
-  // Brand-new user. Default to opt-out for privacy; ask only the prompt
-  // bucket so the rest get a friction-free first launch.
-  if (rollIntoTelemetryPromptBucket()) {
-    setTelemetryDecision('pending');
-    onShowPrompt();
-  } else {
-    optOutTelemetry();
-    // Persist the off-by-default to the settings file directly. The settings
-    // store isn't seeded yet at this point in boot, so saveSysSettings would
-    // write a malformed partial object — write through appService instead.
+  if (settings.telemetryEnabled) {
     settings.telemetryEnabled = false;
     void appService.saveSettings(settings);
   }

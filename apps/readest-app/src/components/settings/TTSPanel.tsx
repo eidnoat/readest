@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
-import { useAppRouter } from '@/hooks/useAppRouter';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { isCustomTTSAllowed } from '@/utils/access';
-import { navigateToLogin, navigateToProfile } from '@/utils/nav';
 import { useReaderStore } from '@/store/readerStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useResetViewSettings } from '@/hooks/useResetSettings';
@@ -37,8 +35,7 @@ import TTSHighlightStyleEditor, { TTSHighlightStyle } from './theme/TTSHighlight
 const TTSPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
-  const router = useAppRouter();
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const hasPremium = isCustomTTSAllowed(token);
   const [showCustomServices, setShowCustomServices] = useState(false);
   const [showVoices, setShowVoices] = useState(false);
@@ -172,12 +169,8 @@ const TTSPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceLibrary, voiceLang]);
 
-  // Custom TTS services are premium: everyone else is routed to the plans page
-  // (or sign-in) instead of the sub-page.
   const handleOpenCustomServices = () => {
-    if (hasPremium) setShowCustomServices(true);
-    else if (user) navigateToProfile(router);
-    else navigateToLogin(router);
+    setShowCustomServices(true);
   };
 
   const handleTTSStyleChange = (style: TTSHighlightStyle) => {

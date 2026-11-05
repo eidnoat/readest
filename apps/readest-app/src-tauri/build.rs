@@ -18,7 +18,6 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,--build-id=sha1");
     }
 
-    propagate_sentry_dsn();
     propagate_app_version();
 
     // Declare the app's own (non-plugin) commands in the ACL app manifest.
@@ -147,30 +146,6 @@ fn read_json_string_field(path: &Path, key: &str) -> Option<String> {
 /// the WebView is too busy to render. The DSN is cleared rather than merely left
 /// unset because `option_env!` would otherwise still see a `SENTRY_DSN` exported
 /// in the developer's shell.
-fn propagate_sentry_dsn() {
-    println!("cargo:rerun-if-env-changed=SENTRY_DSN");
-    let app_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("..");
-    let env_local = app_dir.join(".env.local");
-    let env_file = app_dir.join(".env");
-    println!("cargo:rerun-if-changed={}", env_local.display());
-    println!("cargo:rerun-if-changed={}", env_file.display());
-
-    if env::var("PROFILE").as_deref() != Ok("release") {
-        println!("cargo:rustc-env=SENTRY_DSN=");
-        return;
-    }
-
-    let dsn = env::var("SENTRY_DSN")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| read_env_value(&env_local, "SENTRY_DSN"))
-        .or_else(|| read_env_value(&env_file, "SENTRY_DSN"));
-
-    if let Some(dsn) = dsn {
-        println!("cargo:rustc-env=SENTRY_DSN={dsn}");
-    }
-}
-
 /// Read a single `KEY=value` from a dotenv-style file, skipping blank lines and
 /// `#` comments and stripping surrounding quotes. `None` if the file/key is
 /// absent or the value is empty.

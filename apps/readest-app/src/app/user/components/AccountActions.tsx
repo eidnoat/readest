@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UserPlan } from '@/types/quota';
 
@@ -113,8 +112,8 @@ interface AccountActionsProps {
   userEmail: string;
   planName: string;
   userPlan: UserPlan;
-  customizationPurchased: boolean;
-  iapAvailable: boolean;
+  customizationPurchased?: boolean;
+  iapAvailable?: boolean;
   onLogout: () => void;
   onResetPassword: () => void;
   onUpdateEmail: () => void;
@@ -130,22 +129,18 @@ interface AccountActionsProps {
 const AccountActions: React.FC<AccountActionsProps> = ({
   userEmail,
   planName,
-  userPlan,
-  customizationPurchased,
-  iapAvailable,
+  userPlan: _userPlan,
+  customizationPurchased: _customizationPurchased,
   onLogout,
   onResetPassword,
   onUpdateEmail,
   onConfirmDelete,
   onConfirmDeleteAllBooks,
-  onRestorePurchase,
-  onManageSubscription,
   onManageStorage,
   onManageSharedLinks,
   onManageSync,
 }) => {
   const _ = useTranslation();
-  const { appService } = useEnv();
   const [pendingAction, setPendingAction] = useState<'account' | 'books' | null>(null);
 
   const confirmations = {
@@ -186,31 +181,11 @@ const AccountActions: React.FC<AccountActionsProps> = ({
                 {userEmail}
               </p>
               <p>{planName}</p>
-              {(userPlan !== 'free' || customizationPurchased) && (
-                <p className='font-semibold'>{_('This account has a paid plan or purchases.')}</p>
-              )}
             </div>
           )}
         </DeleteConfirmationModal>
       )}
       <div className='flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3'>
-        {appService?.hasIAP && iapAvailable ? (
-          <button
-            onClick={onRestorePurchase}
-            className='bg-base-300 hover:bg-base-content/15 text-base-content border-base-content/10 eink-bordered w-full rounded-lg border px-6 py-3 font-medium transition-colors duration-150 md:w-auto'
-          >
-            {_('Restore Purchase')}
-          </button>
-        ) : (
-          userPlan !== 'free' && (
-            <button
-              onClick={onManageSubscription}
-              className='bg-base-300 hover:bg-base-content/15 text-base-content border-base-content/10 eink-bordered w-full rounded-lg border px-6 py-3 font-medium transition-colors duration-150 md:w-auto'
-            >
-              {_('Manage Subscription')}
-            </button>
-          )
-        )}
         {onManageSync && (
           <button
             onClick={onManageSync}

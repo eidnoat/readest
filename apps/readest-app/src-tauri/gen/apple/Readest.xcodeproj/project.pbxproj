@@ -13,7 +13,6 @@
 		1F65F6BB7F9A5D5B84F5AC1E /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB09AA381EE87AED8151864C /* WebKit.framework */; };
 		283677BE23AD394BECB28EBE /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D765B7634BFC9B2D619B82E /* MetalKit.framework */; };
 		2F73290CC16EF2B1EF671B9B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF6CC501CA70CA9BBEA6F3D9 /* WidgetKit.framework */; };
-		44677EC36EA80A8D960F4EAA /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = BA7D35F7E90C824A389B15DD /* Sentry */; };
 		4F33997845572B54DBBE431F /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 576303E7E1596790E0DEF8DC /* libapp.a */; };
 		50A87D22EBF9FCA46AAB9CBE /* GetPageContent.js in Resources */ = {isa = PBXBuildFile; fileRef = 49682FE37CE0A63C42BE1590 /* GetPageContent.js */; };
 		6C2F2F58E6E25C554C47E527 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2F0000D58F392BC2F808417D /* Assets.xcassets */; };
@@ -139,7 +138,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				44677EC36EA80A8D960F4EAA /* Sentry in Frameworks */,
 				4F33997845572B54DBBE431F /* libapp.a in Frameworks */,
 				A870FB123FF2CAFB98EDCD36 /* CoreGraphics.framework in Frameworks */,
 				7B3153C771891CB24D874FB8 /* Metal.framework in Frameworks */,
@@ -397,7 +395,6 @@
 			);
 			name = Readest_iOS;
 			packageProductDependencies = (
-				BA7D35F7E90C824A389B15DD /* Sentry */,
 			);
 			productName = Readest_iOS;
 			productReference = DAC68A4107C30410409E5506 /* Readest_iOS.app */;
@@ -469,7 +466,6 @@
 			mainGroup = 9D615C0A1CC543EF4AE91D05;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				C89A16DFD48933F6F6EDCCFE /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2D6F041DFA6B062224902B98 /* Products */;
@@ -915,25 +911,6 @@
 			defaultConfigurationName = debug;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		C89A16DFD48933F6F6EDCCFE /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 8.0.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		BA7D35F7E90C824A389B15DD /* Sentry */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C89A16DFD48933F6F6EDCCFE /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4DC84354F14AFCCC05EC3197 /* Project object */;
 }

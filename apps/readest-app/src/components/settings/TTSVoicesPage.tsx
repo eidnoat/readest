@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { PiSpinner } from 'react-icons/pi';
-import { useAuth } from '@/context/AuthContext';
-import { useAppRouter } from '@/hooks/useAppRouter';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
@@ -11,7 +9,6 @@ import { MULTILINGUAL_LANG } from '@/services/tts/types';
 import { TTSUtils } from '@/services/tts/TTSUtils';
 import type { VoiceLibrary } from '@/services/tts/voiceLibrary';
 import { getPagePreviewText, getSampleText } from '@/services/tts/voicePreviewText';
-import { navigateToLogin, navigateToProfile } from '@/utils/nav';
 import VoiceList, { getVoiceLanguageName } from '@/components/tts/VoiceList';
 import { BoxedList, SettingsRow, SettingsSelect } from './primitives';
 import SubPageHeader from './SubPageHeader';
@@ -37,8 +34,6 @@ const TTSVoicesPage: React.FC<TTSVoicesPageProps> = ({
   onDefaultChange,
 }) => {
   const _ = useTranslation();
-  const router = useAppRouter();
-  const { user } = useAuth();
   const [lang, setLang] = useState(initialLang);
   const [groups, setGroups] = useState<TTSVoicesGroup[] | null>(null);
   const [defaultVoice, setDefaultVoice] = useState(() => TTSUtils.getDefaultVoice(initialLang));
@@ -80,10 +75,7 @@ const TTSVoicesPage: React.FC<TTSVoicesPageProps> = ({
     onDefaultChange();
   };
 
-  const handleUpgrade = () => {
-    if (user) navigateToProfile(router);
-    else navigateToLogin(router);
-  };
+  const handleUpgrade = () => {};
 
   const handleLangChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     preview.stop();

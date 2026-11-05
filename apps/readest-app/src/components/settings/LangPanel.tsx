@@ -1,6 +1,5 @@
 import clsx from 'clsx';
 import React, { useEffect, useState } from 'react';
-import { useAppRouter } from '@/hooks/useAppRouter';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useReaderStore } from '@/store/readerStore';
@@ -18,7 +17,6 @@ import { DEFAULT_PROMPT_ID, isCustomTranslatorName } from '@/services/translator
 import { useCustomTranslatorStore } from '@/store/customTranslatorStore';
 import { getLocale } from '@/utils/misc';
 import { isCustomTranslatorAllowed } from '@/utils/access';
-import { navigateToLogin, navigateToProfile } from '@/utils/nav';
 import { useResetViewSettings } from '@/hooks/useResetSettings';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { TRANSLATED_LANGS, TRANSLATOR_LANGS } from '@/services/constants';
@@ -41,8 +39,7 @@ import { PiTranslate } from 'react-icons/pi';
 
 const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
-  const router = useAppRouter();
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const { envConfig } = useEnv();
   const hasPremium = isCustomTranslatorAllowed(token);
   const { settings, applyUILanguage, activeSettingsItemId, setActiveSettingsItemId } =
@@ -222,12 +219,8 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     setViewSettings(bookKey, { ...viewSettings });
   };
 
-  // Custom translators are premium: everyone else is routed to the plans page
-  // (or sign-in) instead of the sub-page.
   const handleOpenCustomTranslators = () => {
-    if (hasPremium) setShowCustomTranslators(true);
-    else if (user) navigateToProfile(router);
-    else navigateToLogin(router);
+    setShowCustomTranslators(true);
   };
 
   const translationFontOptions = [
