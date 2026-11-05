@@ -66,25 +66,10 @@ jobs:
           cd apps/readest-app
           pnpm build
 
-      - name: Build iOS App with Tauri and Xcode
+      - name: Build iOS App with Tauri
         run: |
           cd apps/readest-app
-          echo "Attempting tauri ios build..."
-          pnpm tauri ios build --no-sign || true
-
-          # If neither an IPA nor an .app was produced by tauri, use xcodebuild archive
-          if [ ! -f "src-tauri/gen/apple/build/arm64/Readest.ipa" ] && [ -z "$(find src-tauri/gen/apple/build -name '*.app' -type d 2>/dev/null)" ]; then
-            echo "Building via xcodebuild archive..."
-            xcodebuild -project src-tauri/gen/apple/Readest.xcodeproj \
-              -scheme Readest_iOS \
-              -configuration Release \
-              -destination 'generic/platform=iOS' \
-              -archivePath src-tauri/gen/apple/build/Readest.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY="" \
-              archive
-          fi
+          pnpm tauri ios build --no-sign
 
       - name: Package IPA
         run: |
@@ -92,7 +77,7 @@ jobs:
           mkdir -p build-output
 
           if [ -f "src-tauri/gen/apple/build/arm64/Readest.ipa" ]; then
-            echo "Using existing Readest.ipa from build directory..."
+            echo "Found Readest.ipa at src-tauri/gen/apple/build/arm64/Readest.ipa"
             cp "src-tauri/gen/apple/build/arm64/Readest.ipa" build-output/Readest.ipa
           else
             APP_BUNDLE=$(find src-tauri/gen/apple/build -name "*.app" -type d | grep -E "Readest(_iOS)?\.app" | head -n 1)
@@ -106,7 +91,7 @@ jobs:
               zip -qr build-output/Readest.ipa Payload
               rm -rf Payload
             else
-              echo "Error: No .app bundle found to package!"
+              echo "Error: No IPA or app bundle found!"
               find src-tauri/gen/apple/build || true
               exit 1
             fi
