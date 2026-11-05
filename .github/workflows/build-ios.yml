@@ -23,6 +23,15 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Select Xcode 16
+        run: |
+          XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
+          if [ -n "$XCODE_APP" ]; then
+            echo "Selecting $XCODE_APP"
+            sudo xcode-select -s "$XCODE_APP"
+          fi
+          xcodebuild -version
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -60,11 +69,11 @@ jobs:
       - name: Build iOS App with Tauri and Xcode
         run: |
           cd apps/readest-app
-          # Attempt tauri ios build without signing
+          echo "Attempting tauri ios build..."
           pnpm tauri ios build --no-sign || true
 
-          # If archive / app was not built by tauri CLI, compile via xcodebuild archive
-          if [ ! -d "src-tauri/gen/apple/build/arm64/Readest.app" ] && [ ! -d "src-tauri/gen/apple/build/Readest.xcarchive" ]; then
+          # If neither an IPA nor an .app was produced by tauri, use xcodebuild archive
+          if [ ! -f "src-tauri/gen/apple/build/arm64/Readest.ipa" ] && [ -z "$(find src-tauri/gen/apple/build -name '*.app' -type d 2>/dev/null)" ]; then
             echo "Building via xcodebuild archive..."
             xcodebuild -project src-tauri/gen/apple/Readest.xcodeproj \
               -scheme Readest_iOS \
