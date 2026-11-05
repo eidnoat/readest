@@ -46,7 +46,8 @@ enum OrientationLock {
     guard shouldLock != locked else { return }
     locked = shouldLock
     for window in scene.windows {
-      window.rootViewController?.setNeedsUpdateOfPrefersInterfaceOrientationLocked()
+      window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+      _ = window.rootViewController?.perform(NSSelectorFromString("setNeedsUpdateOfPrefersInterfaceOrientationLocked"))
     }
   }
 
