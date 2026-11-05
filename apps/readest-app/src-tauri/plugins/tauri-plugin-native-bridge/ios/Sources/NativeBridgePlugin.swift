@@ -1611,6 +1611,7 @@ class NativeBridgePlugin: Plugin {
         // window's own effective radius is 0, but a window-sized child with a
         // container-concentric configuration resolves to the display radius.
         var bottomCornerRadius: CGFloat = 0
+        #if canImport(UIKit, _version: 9127.0.85)
         if #available(iOS 26.0, *) {
           let probe = UIView(frame: window.bounds)
           probe.cornerConfiguration = .corners(radius: .containerConcentric())
@@ -1618,6 +1619,7 @@ class NativeBridgePlugin: Plugin {
           bottomCornerRadius = probe.effectiveRadius(corner: [.bottomLeft, .bottomRight])
           probe.removeFromSuperview()
         }
+        #endif
         var response: [String: Any] = [
           "top": insets.top,
           "left": insets.left,
