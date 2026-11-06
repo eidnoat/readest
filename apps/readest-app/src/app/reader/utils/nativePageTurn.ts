@@ -142,9 +142,9 @@ export class NativePageTurn extends CapturedPageTurn {
       void ack.finally(() => this.#cancellations.delete(ack));
     };
     signal?.addEventListener('abort', cancel, { once: true });
-    let restore: void | (() => void | Promise<void>);
+    let restore: (() => void | Promise<void>) | null = null;
     try {
-      restore = await this.host.preparePixelCapture?.();
+      restore = (await this.host.preparePixelCapture?.()) ?? null;
       if (signal?.aborted || generation !== this.#generation || !this.#allowed()) return false;
       const result = await this.#call({ op: 'capture', key, requestId, ...rect });
       if (
