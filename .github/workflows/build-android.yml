@@ -95,7 +95,7 @@ jobs:
         run: |
           cd apps/readest-app
           mkdir -p build-output
-          dotenv -e .env.tauri -- pnpm tauri android build -t aarch64
+          pnpm tauri android build -t aarch64
 
           APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
           echo "Found APK: $APK_FILE"
