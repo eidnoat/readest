@@ -497,7 +497,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
 
     const pageInfo = bookData.isFixedLayout ? section : pageinfo;
     const progress: [number, number] = [pageInfo.current + 1, pageInfo.total];
-    const progressPercentage = Math.round((progress[0] / progress[1]) * 100);
+    const progressPercentage =
+      pageInfo.total > 0 ? Math.round((progress[0] / pageInfo.total) * 100) : 0;
 
     // Lightweight library update — O(1) lookup, no array copy, no refreshGroups
     const { getBookByHash, updateBookProgress } = useLibraryStore.getState();

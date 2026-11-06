@@ -19,12 +19,12 @@ export interface TurnGestureSample {
 
 export const NATIVE_CAPTURED_TURN_ATTRIBUTE = 'captured-turn-style';
 export const NATIVE_PROGRAMMATIC_TURN_ATTRIBUTE = 'captured-turn-programmatic';
-export const TURN_EDGE_ZONE_RATIO = 0.18;
+export const TURN_EDGE_ZONE_RATIO = 0.25;
 export const TURN_FAST_CLAIM_DISTANCE_PX = 6;
 export const TURN_FAST_CLAIM_MAX_SAMPLE_GAP_MS = 80;
 export const TURN_RESERVED_INSET_FALLBACK_PX = 24;
 export const TURN_VERTICAL_LOCK_DISTANCE_PX = 8;
-export const TURN_DIRECTION_DOMINANCE = 1.5;
+export const TURN_DIRECTION_DOMINANCE = 1.2;
 
 export const createTurnGestureIntent = (
   edgeDirection: TurnGestureDirection,

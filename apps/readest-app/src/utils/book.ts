@@ -482,19 +482,17 @@ export const getCurrentPage = (book: Book, progress: BookProgress) => {
 };
 
 /**
- * A book is "currently reading" iff it has real reading progress and has not
- * been parked. Importing a book sets timestamps but never `progress` (only
- * opening it does), so the progress gate drops freshly-added-but-unopened
- * books; the status gate drops finished, abandoned (on hold) and
- * manually-marked-unread books. A book actively being read has `readingStatus`
- * either `undefined` (cleared from 'unread' on first open) or `'reading'`, both
- * of which pass. Shared by the library's recently-read shelf and the
- * home-screen bookshelf widget so the two surfaces stay in sync.
+ * A book is "currently reading" / "recently read" iff it has real reading progress
+ * and has not been parked. Importing a book sets timestamps but never `progress`
+ * (only opening it does), so the progress gate drops freshly-added-but-unopened
+ * books; the status gate drops abandoned (on hold) and manually-marked-unread books.
+ * Finished books are allowed so they remain in Recently Read once completed.
+ * Shared by the library's recently-read shelf and the home-screen bookshelf widget
+ * so the two surfaces stay in sync.
  */
 export const isCurrentlyReadingBook = (book: Book): boolean =>
   !book.deletedAt &&
   book.progress != null &&
-  book.readingStatus !== 'finished' &&
   book.readingStatus !== 'abandoned' &&
   book.readingStatus !== 'unread';
 

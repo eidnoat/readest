@@ -40,8 +40,12 @@ private final class FrameLink: NSObject {
   init(_ tick: @escaping (FrameLink, CFTimeInterval) -> Void) {
     self.tick = tick
     super.init()
-    link = CADisplayLink(target: self, selector: #selector(fire(_:)))
-    link?.add(to: .main, forMode: .common)
+    let displayLink = CADisplayLink(target: self, selector: #selector(fire(_:)))
+    if #available(iOS 15.0, *) {
+      displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+    }
+    displayLink.add(to: .main, forMode: .common)
+    link = displayLink
   }
 
   @objc private func fire(_ link: CADisplayLink) { tick(self, link.timestamp) }
@@ -592,20 +596,19 @@ final class NativePaperTurn {
     let span = abs(animationTarget - from)
     let velocity = abs(args.velocity ?? 0)
     let duration = max(
-      100, min(240, velocity > 0.3 ? Double(span) * Double(width) / velocity : 240 * Double(span)))
+      120, min(280, velocity > 0.3 ? Double(span) * Double(width) / velocity : 280 * Double(span)))
     if span < 0.001 { return completeAnimation() }
     var lastTime: CFTimeInterval = 0
     var elapsed = 0.0
     animation = FrameLink { [weak self] _, now in
       guard let self, self.animationPending === p, p.live else { return }
-      // A stalled frame advances the clock by at most 1/6 of the minimum
-      // duration, so a hitch slows the sheet instead of skipping poses.
-      if lastTime != 0 { elapsed += min(max((now - lastTime) * 1000, 0), 100.0 / 6) }
+      if lastTime != 0 { elapsed += min(max((now - lastTime) * 1000, 0), 50.0) }
       lastTime = now
       // A following gesture accelerates the tail, keeping the 100 ms minimum.
       let settle = self.completeRequested ? min(duration, 100) : duration
       let t = min(elapsed / settle, 1)
-      self.progress = from + (self.animationTarget - from) * Float(t)
+      let easedT = 1.0 - pow(1.0 - t, 3.0)
+      self.progress = from + (self.animationTarget - from) * Float(easedT)
       if t < 1 { self.draw() } else { self.completeAnimation() }
     }
   }
@@ -636,7 +639,7 @@ final class NativePaperTurn {
       guard let self, self.animationPending === p, p.live else { return }
       if lastTime != 0 {
         // A following gesture hurries the tail rather than cutting it.
-        let dt = now - lastTime
+        let dt = min(now - lastTime, 0.05)
         moving = self.flip.advance(self.completeRequested ? dt * 2 : dt)
         self.pushFlip()
       }
@@ -715,6 +718,8 @@ final class NativePaperView: UIView {
   private var textures: [String: MTLTexture] = [:]
   private(set) var keys: [String] = []
   private let mesh = NativePaperMesh()
+  private var vertexBuffer: MTLBuffer?
+  private var vertexBufferOffset = 0
   private var current: String?
   private var destination: String?
   private var forward = true
@@ -738,6 +743,7 @@ final class NativePaperView: UIView {
     metalLayer.framebufferOnly = true
     // Each frame commits with the transaction that shows or hides the sheet.
     metalLayer.presentsWithTransaction = true
+    vertexBuffer = gpu.device.makeBuffer(length: 128 * 1024, options: .storageModeShared)
   }
 
   required init?(coder: NSCoder) { nil }
@@ -906,6 +912,7 @@ final class NativePaperView: UIView {
     var page = SIMD2<Float>(Float(pixelsWide), Float(pixelsHigh))
     encoder.setVertexBytes(&page, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
     encoder.setFragmentBytes(&page, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
+    vertexBufferOffset = 0
     let base = forward ? destination : current
     let sheet = forward ? current : destination
     let pose = forward ? progress : 1 - progress
@@ -919,9 +926,8 @@ final class NativePaperView: UIView {
       try drawPage(encoder, sheet, pose, grabY)
     }
     encoder.endEncoding()
+    commands.present(drawable)
     commands.commit()
-    commands.waitUntilScheduled()
-    drawable.present()
   }
 
   /// Render one textured sheet. A spread sheet turns only its outer column;
@@ -933,13 +939,19 @@ final class NativePaperView: UIView {
     guard let key, let texture = textures[key] else { return }
     let backTexture = back.flatMap { textures[$0] }
     guard mesh.build(pixelsWide, pixelsHigh, p, y, rtl, spreadColumns) > 0 else { return }
-    guard
-      let vertices = mesh.vertices.withUnsafeBytes({
-        gpu.device.makeBuffer(bytes: $0.baseAddress!, length: mesh.count * 4)
-      })
-    else { throw PaperError("Cannot allocate native paper mesh") }
+    let byteCount = mesh.count * 4
+    if vertexBuffer == nil || vertexBuffer!.length < vertexBufferOffset + byteCount {
+      vertexBuffer = gpu.device.makeBuffer(
+        length: max(128 * 1024, vertexBufferOffset + byteCount), options: .storageModeShared)
+    }
+    guard let buffer = vertexBuffer else { throw PaperError("Cannot allocate native paper mesh") }
+    let offset = vertexBufferOffset
+    vertexBufferOffset += ((byteCount + 255) / 256) * 256
+    mesh.vertices.withUnsafeBytes { raw in
+      buffer.contents().advanced(by: offset).copyMemory(from: raw.baseAddress!, byteCount: byteCount)
+    }
     var spread: Float = backTexture != nil ? 1 : 0
-    encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+    encoder.setVertexBuffer(buffer, offset: offset, index: 0)
     encoder.setFragmentBytes(&spread, length: MemoryLayout<Float>.size, index: 0)
     encoder.setFragmentTexture(texture, index: 0)
     encoder.setFragmentTexture(backTexture ?? texture, index: 1)

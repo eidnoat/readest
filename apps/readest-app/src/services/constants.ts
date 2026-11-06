@@ -512,7 +512,7 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   showBatteryPercentage: true,
   use24HourClock: false,
   showPaginationButtons: false,
-  stablePageNumbers: true,
+  stablePageNumbers: false,
   progressStyle: 'fraction',
   referencePageCount: 0,
 

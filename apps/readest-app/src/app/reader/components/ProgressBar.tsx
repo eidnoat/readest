@@ -111,7 +111,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   const sectionIndex = section?.current ?? 0;
   const sections = bookData?.bookDoc?.sections;
   const isCalibratedPair =
-    viewSettings.stablePageNumbers === false &&
+    viewSettings.stablePageNumbers !== true &&
     readingProgressStyle === 'fraction' &&
     !bookData?.isFixedLayout &&
     !viewSettings.scrolled &&

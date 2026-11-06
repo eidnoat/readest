@@ -433,8 +433,8 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
         animationTarget = if (args.commit && !cancelled) 1f else 0f
         val from = progress
         val span = abs(animationTarget - from)
-        val duration = maxOf(100f, minOf(240f, if (abs(args.velocity) > 0.3f)
-            span * width / (abs(args.velocity) * webView.resources.displayMetrics.density) else 240f * span))
+        val duration = maxOf(120f, minOf(280f, if (abs(args.velocity) > 0.3f)
+            span * width / (abs(args.velocity) * webView.resources.displayMetrics.density) else 280f * span))
         if (span < 0.001f) { completeAnimation(); return }
         var last = 0L
         var elapsed = 0f
@@ -443,14 +443,15 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
                 if (animationPending !== p || !p.live) return
                 // Advance only after the preceding image was acquired. A GL
                 // stall must not spend the entire animation on unseen frames.
-                if (last != 0L) elapsed += ((now - last) / 1_000_000f).coerceIn(0f, 100f / 6f)
+                if (last != 0L) elapsed += ((now - last) / 1_000_000f).coerceIn(0f, 50f)
                 last = now
                 // A following gesture accelerates the tail, but cannot erase
                 // a scene before its first curved frame. Keep the 100ms
                 // minimum even when completion arrived before animate.
                 val settleDuration = if (completeRequested) minOf(duration, 100f) else duration
                 val t = (elapsed / settleDuration).coerceAtMost(1f)
-                progress = from + (animationTarget - from) * t
+                val easedT = 1f - (1f - t) * (1f - t) * (1f - t)
+                progress = from + (animationTarget - from) * easedT
                 if (t < 1f) view?.drawPresented(progress, grabY) { error ->
                     if (animationPending !== p || !p.live) return@drawPresented
                     if (error != null) failAll(error.message ?: "Native animation frame failed")

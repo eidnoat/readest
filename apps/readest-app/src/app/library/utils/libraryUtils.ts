@@ -680,9 +680,11 @@ export const createBookGroups = (
       // for a book with no status and no progress. Every book lands in exactly
       // one bucket and nothing is left ungrouped.
       (book) =>
-        isCurrentlyReadingBook(book)
-          ? ['reading' satisfies ReadingStatus]
-          : [book.readingStatus ?? ('unread' satisfies ReadingStatus)],
+        book.readingStatus
+          ? [book.readingStatus]
+          : isCurrentlyReadingBook(book)
+            ? ['reading' satisfies ReadingStatus]
+            : ['unread' satisfies ReadingStatus],
       (status) => READING_STATUS_LABELS[status as ReadingStatus] ?? status,
     );
   }

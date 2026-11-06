@@ -123,8 +123,7 @@ export const BOOKSHELF_FIELDS: BookshelfField[] = [
     id: 'currentlyReading',
     label: _('Currently reading'),
     kind: 'boolean',
-    read: (b) =>
-      b.progress != null && !['unread', 'finished', 'abandoned'].includes(b.readingStatus || ''),
+    read: (b) => b.progress != null && !['unread', 'abandoned'].includes(b.readingStatus || ''),
   },
   { id: 'pages', label: _('Pages'), kind: 'number', read: (b) => getBookPageCount(b) },
   { id: 'created', label: _('Date Added'), kind: 'date', read: (b) => b.createdAt },

@@ -206,10 +206,10 @@ describe('ProgressBar — calibrated page pair', () => {
     };
   };
 
-  it('keeps the stable byte-grid pair by default', () => {
+  it('keeps the stable byte-grid pair when stablePageNumbers is enabled', () => {
     setupFraction({
       sections: [{ size: 1500 }, { size: 1500 }, { size: 15000 }],
-      stablePageNumbers: DEFAULT_VIEW_CONFIG.stablePageNumbers,
+      stablePageNumbers: true,
     });
     recordChapterScreens('book-1', 2, 10);
     currentRenderer = { page: 3, pages: 10 };

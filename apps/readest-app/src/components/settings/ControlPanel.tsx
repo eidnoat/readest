@@ -50,7 +50,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
     viewSettings.showPaginationButtons,
   );
   const [stablePageNumbers, setStablePageNumbers] = useState(
-    viewSettings.stablePageNumbers ?? true,
+    viewSettings.stablePageNumbers ?? false,
   );
   const [isDisableClick, setIsDisableClick] = useState(viewSettings.disableClick);
   const [isDisableSwipe, setIsDisableSwipe] = useState(viewSettings.disableSwipe);
@@ -278,7 +278,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
   }, [showPaginationButtons]);
 
   useEffect(() => {
-    if (stablePageNumbers === (viewSettings.stablePageNumbers ?? true)) return;
+    if (stablePageNumbers === (viewSettings.stablePageNumbers ?? false)) return;
     saveViewSettings(envConfig, bookKey, 'stablePageNumbers', stablePageNumbers, false, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stablePageNumbers]);

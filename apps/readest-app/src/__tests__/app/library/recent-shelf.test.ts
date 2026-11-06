@@ -56,7 +56,7 @@ describe('selectRecentShelfBooks', () => {
     expect(selectRecentShelfBooks([opened], 10).map((book) => book.hash)).toEqual(['opened']);
   });
 
-  it('excludes finished, abandoned and unread books even when they have progress', () => {
+  it('excludes abandoned and unread books, but includes finished books when they have progress', () => {
     const reading = createMockBook({ hash: 'reading', updatedAt: 1000 });
     const finished = createMockBook({
       hash: 'finished',
@@ -72,7 +72,7 @@ describe('selectRecentShelfBooks', () => {
 
     const result = selectRecentShelfBooks([reading, finished, abandoned, unread], 10);
 
-    expect(result.map((book) => book.hash)).toEqual(['reading']);
+    expect(result.map((book) => book.hash)).toEqual(['finished', 'reading']);
   });
 
   it('slices to the requested count, keeping the most recent', () => {

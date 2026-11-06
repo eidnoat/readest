@@ -294,9 +294,9 @@ const FoliateViewer: React.FC<{
       ? getLockedPanX(viewRef.current, getViewSettings(bookKey))
       : undefined;
     if (panX !== undefined && panX !== getConfig(bookKey)?.panX) setConfig(bookKey, { panX });
-    // Stable page numbers (the default) keep the byte-grid pair and need no
+    // Stable page numbers keep the byte-grid pair and need no
     // measurements; only the screen-counted readout samples chapters.
-    if (getViewSettings(bookKey)?.stablePageNumbers !== false) return;
+    if (getViewSettings(bookKey)?.stablePageNumbers) return;
     // Sample the section's measured spread count as it becomes primary: the
     // session map calibrates the book-level page pair (chapterScreens.ts).
     // Chunked sections report chunk-local counts, so they stay byte-estimated.
