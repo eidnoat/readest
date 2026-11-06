@@ -6,11 +6,13 @@ import type {
   BookshelfRule,
 } from '@/types/bookshelf';
 import { LibrarySortByType, LibraryGroupByType, type SystemSettings } from '@/types/settings';
+import { DEFAULT_RECENT_SHELF_LIMIT } from '@/services/constants';
 import { bookshelfFieldOperators, getBookshelfField } from './fields';
 import { stubTranslation as _ } from '@/utils/misc';
 
 export const DEFAULT_BOOKSHELF_ID = 'default';
 export const RECENT_BOOKSHELF_ID = 'recent';
+export { DEFAULT_RECENT_SHELF_LIMIT };
 export const AUDIOBOOKS_BOOKSHELF_ID = 'audiobooks';
 export const PODCASTS_BOOKSHELF_ID = 'podcasts';
 export const FINISHED_BOOKSHELF_ID = 'finished';
@@ -202,6 +204,7 @@ export const defaultBookshelves = (settings: Partial<SystemSettings>): Bookshelf
     coverFit: settings.libraryCoverFit || 'crop',
     hideCovers: settings.libraryHideCovers ?? false,
     enabled: settings.libraryRecentShelfEnabled ?? true,
+    limit: settings.libraryRecentShelfLimit ?? DEFAULT_RECENT_SHELF_LIMIT,
     // A quick-resume strip of the books themselves, never folder/series tiles.
     useGlobalGrouping: false,
     groupBy: 'none',

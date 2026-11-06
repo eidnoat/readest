@@ -208,6 +208,8 @@ export const DEFAULT_ICLOUD_SETTINGS = {
   lastSyncedAt: 0,
 } as ICloudSettings;
 
+export const DEFAULT_RECENT_SHELF_LIMIT = 20;
+
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   keepLogin: false,
   alwaysOnTop: false,
@@ -251,6 +253,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   librarySkeuomorphicCovers: false,
   libraryHideCovers: false,
   libraryRecentShelfEnabled: false,
+  libraryRecentShelfLimit: DEFAULT_RECENT_SHELF_LIMIT,
 
   metadataSeriesCollapsed: false,
   metadataOthersCollapsed: false,

@@ -12,6 +12,7 @@ import {
   BUILTIN_BOOKSHELF_POSITIONS,
   DEFAULT_BOOKSHELF_ID,
   RECENT_BOOKSHELF_ID,
+  DEFAULT_RECENT_SHELF_LIMIT,
 } from './definitions';
 import { stubTranslation as _ } from '@/utils/misc';
 
@@ -63,6 +64,10 @@ export const readBookshelves = (settings: Partial<SystemSettings>): BookshelfDef
         coverFit: parsed.data.coverFit ?? settings.libraryCoverFit ?? 'crop',
         skeuomorphicCovers:
           parsed.data.skeuomorphicCovers ?? settings.librarySkeuomorphicCovers ?? false,
+        ...(id === RECENT_BOOKSHELF_ID && {
+          limit:
+            parsed.data.limit ?? settings.libraryRecentShelfLimit ?? DEFAULT_RECENT_SHELF_LIMIT,
+        }),
       });
   }
   return [...definitions.values()].sort((a, b) => {

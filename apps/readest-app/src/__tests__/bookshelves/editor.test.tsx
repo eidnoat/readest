@@ -800,6 +800,18 @@ describe('bookshelf editor', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Recently read/ }));
     expect((screen.getByLabelText('Show page count') as HTMLInputElement).checked).toBe(false);
   });
+  it('configures retained books limit for Recently read shelf and saves automatically', async () => {
+    render(<BookshelvesEditor />);
+    fireEvent.click(screen.getByRole('button', { name: /^Recently read/ }));
+    const input = screen.getByLabelText('Retained books') as HTMLInputElement;
+    expect(input).toBeDefined();
+    expect(input.value).toBe('20');
+    fireEvent.change(input, { target: { value: '15' } });
+    await waitFor(() => {
+      const saved = save.mock.calls.at(-1)?.[2].find((s: BookshelfDefinition) => s.id === 'recent');
+      expect(saved?.limit).toBe(15);
+    });
+  });
   it('drops the page count key when the switch is turned off, so older clients still parse the shelf (#6909)', async () => {
     render(<BookshelvesEditor />);
     fireEvent.click(screen.getByRole('button', { name: 'Default' }));

@@ -1,7 +1,12 @@
 import type { Book } from '@/types/book';
 import type { BookshelfDefinition, BookshelfFilterGroup, BookshelfRule } from '@/types/bookshelf';
 import { createBookSorter, withTimeRemainingLast } from '@/app/library/utils/libraryUtils';
-import { bookshelfSchema, effectiveBookshelves, FINISHED_BOOKSHELF_ID } from './definitions';
+import {
+  bookshelfSchema,
+  effectiveBookshelves,
+  FINISHED_BOOKSHELF_ID,
+  RECENT_BOOKSHELF_ID,
+} from './definitions';
 import { getBookshelfField } from './fields';
 
 const normalized = (value: unknown) => String(value).normalize('NFKC').toLocaleLowerCase();
@@ -178,10 +183,16 @@ export const evaluateBookshelves = (
       available.sort(
         withTimeRemainingLast<Book>(by, (a, b) => compare(a, b) || a.hash.localeCompare(b.hash)),
       );
+      const booksToKeep =
+        definition.id === RECENT_BOOKSHELF_ID &&
+        typeof definition.limit === 'number' &&
+        definition.limit > 0
+          ? available.slice(0, definition.limit)
+          : available;
       return {
         definition,
         matching: raw.length,
         excluded: raw.length - available.length,
-        books: available,
+        books: booksToKeep,
       };
     });

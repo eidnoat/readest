@@ -541,6 +541,8 @@ export interface SystemSettings {
   libraryHideCovers: boolean;
   /** Show the recently-read carousel at the top of the library (issue #3797). */
   libraryRecentShelfEnabled: boolean;
+  /** Maximum number of books retained in the recently-read shelf. */
+  libraryRecentShelfLimit?: number;
   /**
    * Library page background texture, configured independently from the reader
    * background (issue #4743). When any of these is undefined the library

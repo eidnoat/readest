@@ -452,6 +452,23 @@ describe('bookshelf evaluation', () => {
       ),
     ).toEqual(['b', 'a', 'c']);
   });
+  it('caps Recently read shelf results to the configured limit', () => {
+    const books: Book[] = Array.from({ length: 10 }, (_, i) => ({
+      ...book(`b${i}`),
+      progress: [1, 100],
+      updatedAt: 1000 + i,
+    }));
+    const recent = {
+      ...defaultBookshelves({}).find((s) => s.id === 'recent')!,
+      limit: 5,
+    };
+    const results = evaluateBookshelves(books, [recent]);
+    const shelfResult = results.find((s) => s.definition.id === 'recent')!;
+    expect(shelfResult.matching).toBe(10);
+    expect(shelfResult.books).toHaveLength(5);
+    // Highest updatedAt first
+    expect(shelfResult.books.map((b) => b.hash)).toEqual(['b9', 'b8', 'b7', 'b6', 'b5']);
+  });
   it('migrates legacy preferences and falls back to Default when none are enabled', () => {
     const defaults = defaultBookshelves({
       libraryViewMode: 'list',

@@ -12,4 +12,14 @@ describe('Recently read shelf defaults', () => {
     expect(recent.groupBy).toBe('none');
     expect(resolveBookshelfGroupBy(recent, LibraryGroupByType.Group)).toBe('none');
   });
+
+  it('defaults to 20 retained books and respects custom libraryRecentShelfLimit', () => {
+    const recentDefault = defaultBookshelves({}).find((shelf) => shelf.id === RECENT_BOOKSHELF_ID)!;
+    expect(recentDefault.limit).toBe(20);
+
+    const recentCustom = defaultBookshelves({ libraryRecentShelfLimit: 15 }).find(
+      (shelf) => shelf.id === RECENT_BOOKSHELF_ID,
+    )!;
+    expect(recentCustom.limit).toBe(15);
+  });
 });

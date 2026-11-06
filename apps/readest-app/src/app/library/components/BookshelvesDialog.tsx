@@ -39,6 +39,7 @@ import BoxedList from '@/components/settings/primitives/BoxedList';
 import SettingsRow from '@/components/settings/primitives/SettingsRow';
 import SettingsSelect from '@/components/settings/primitives/SettingsSelect';
 import SettingsSwitchRow from '@/components/settings/primitives/SettingsSwitchRow';
+import SettingsInput from '@/components/settings/primitives/SettingsInput';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -719,6 +720,31 @@ export function BookshelvesEditor({
                   update({ showPageCount: selected.showPageCount ? undefined : true })
                 }
               />
+              {selected.id === RECENT_BOOKSHELF_ID && (
+                <SettingsRow label={_('Retained books')}>
+                  <SettingsInput
+                    type='number'
+                    min={1}
+                    step={1}
+                    placeholder={_('Unlimited')}
+                    aria-label={_('Retained books')}
+                    value={selected.limit ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.trim();
+                      if (!raw) {
+                        update({ limit: undefined });
+                      } else {
+                        const num = parseInt(raw, 10);
+                        if (Number.isSafeInteger(num) && num > 0) {
+                          update({ limit: num });
+                        } else if (num === 0) {
+                          update({ limit: undefined });
+                        }
+                      }
+                    }}
+                  />
+                </SettingsRow>
+              )}
             </BoxedList>
             <BookshelfFilterEditor
               group={selected.filters}
