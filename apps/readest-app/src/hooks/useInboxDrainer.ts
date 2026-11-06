@@ -47,6 +47,11 @@ function getDeviceId(): string {
  * stay off the throttled cover-sync path.
  */
 export function useInboxDrainer(): void {
+  // Disabled: no official Readest Cloud inbox.
+  return;
+}
+
+export function _unusedUseInboxDrainer(): void {
   const { envConfig, appService } = useEnv();
   const { user } = useAuth();
   const { settings } = useSettingsStore();

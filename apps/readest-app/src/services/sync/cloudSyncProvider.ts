@@ -67,8 +67,7 @@ export const hasAnyThirdPartyEnabled = (settings: SystemSettings | null | undefi
  * Cloud. Once the user touches a Cloud Sync checkbox the flag is explicit and
  * wins.
  */
-export const isReadestCloudEnabled = (settings: SystemSettings | null | undefined): boolean =>
-  settings?.readestCloud?.enabled ?? !hasAnyThirdPartyEnabled(settings);
+export const isReadestCloudEnabled = (_settings?: SystemSettings | null): boolean => false;
 
 /** Every provider syncing the library on this device, Readest Cloud first. */
 export const getCloudSyncProviders = (
@@ -87,28 +86,22 @@ export const cloudProvidersDisplayName = (kinds: CloudSyncProviderKind[]): strin
  * auth JWT — non-React modules (transferManager, syncCategories) cannot
  * resolve it synchronously. The plan-resolution flow (auth / quota
  * refresh) writes the latest plan here; gate checks read it back.
- * Defaults to 'free', the most restrictive plan, so a gate evaluated
- * before the first auth resolution can only be too cautious, never too
- * permissive.
  */
-let cachedUserPlan: UserPlan = 'free';
+let cachedUserPlan: UserPlan = 'pro';
 
 export const setCachedUserPlan = (plan: UserPlan | undefined): void => {
-  cachedUserPlan = plan ?? 'free';
+  cachedUserPlan = plan ?? 'pro';
 };
 
 export const getCachedUserPlan = (): UserPlan => cachedUserPlan;
 
 /**
- * Cached alongside the plan for the same reason: premium access is now the
- * plan OR an outright Full Customization purchase, and a storage-only buyer
- * reports the `purchase` plan without being entitled. Defaults to false, the
- * restrictive side.
+ * Cached alongside the plan for the same reason.
  */
-let cachedCustomizationPurchased = false;
+let cachedCustomizationPurchased = true;
 
 export const setCachedCustomizationPurchased = (purchased: boolean | undefined): void => {
-  cachedCustomizationPurchased = purchased ?? false;
+  cachedCustomizationPurchased = purchased ?? true;
 };
 
 export const getCachedCustomizationPurchased = (): boolean => cachedCustomizationPurchased;

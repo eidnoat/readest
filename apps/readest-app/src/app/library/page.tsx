@@ -214,7 +214,7 @@ const LibraryPageWithSearchParams = () => {
 const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchParams | null }) => {
   const router = useAppRouter();
   const { envConfig, appService } = useEnv();
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const {
     library: libraryBooks,
     libraryLoaded: libraryLoadedFromDisk,
@@ -749,24 +749,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     if (isInitiating.current) return;
     isInitiating.current = true;
 
-    const initLogin = async () => {
-      const appService = await envConfig.getAppService();
-      const settings = await appService.loadSettings();
-      if (token && user) {
-        if (!settings.keepLogin) {
-          settings.keepLogin = true;
-          setSettings(settings);
-          saveSettings(envConfig, settings);
-        }
-      } else if (settings.keepLogin) {
-        router.push('/auth');
-      }
-    };
-
-    // Reuse the in-store library only when it was actually loaded from disk.
-    // Gating on `length > 0` was unsafe: a transient "Open with" entry made the
-    // store non-empty before any disk load, so this skipped loadLibraryBooks and
-    // a later save persisted the partial library (wiping library.json).
     const hasCachedLibrary = libraryLoadedFromDisk;
     const loadingTimeout = hasCachedLibrary ? null : setTimeout(() => setLoading(true), 500);
     const initLibrary = async () => {
@@ -853,7 +835,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       });
     };
 
-    initLogin().catch((error) => console.error('Failed to initialize login:', error));
     initLibrary().catch(recoverFromInitFailure);
     return () => {
       setCheckOpenWithBooks(false);

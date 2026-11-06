@@ -10,19 +10,15 @@ import {
   RiBookmark3Line,
   RiFileList3Line,
   RiDiscordLine,
-  RiSendPlaneLine,
   RiWifiLine,
   RiCloudLine,
-  RiCloudFill,
   RiDatabase2Line,
   RiGoogleLine,
   RiMicrosoftLine,
   RiAppleLine,
   RiHeadphoneLine,
 } from 'react-icons/ri';
-import { useAppRouter } from '@/hooks/useAppRouter';
 import { useEnv } from '@/context/EnvContext';
-import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { useQuotaStats } from '@/hooks/useQuotaStats';
@@ -43,7 +39,6 @@ import { getGoogleWebClientId } from '@/services/sync/providers/gdrive/buildGoog
 import { getMicrosoftClientId } from '@/services/sync/providers/onedrive/buildOneDriveProvider';
 import { isICloudSupportedPlatform } from '@/services/sync/providers/icloud/buildICloudProvider';
 import { getICloudContainerStatus } from '@/utils/bridge';
-import { navigateToLogin, navigateToProfile } from '@/utils/nav';
 import { eventDispatcher } from '@/utils/event';
 import ABSForm from './integrations/ABSForm';
 import BookOrbitForm from './integrations/BookOrbitForm';
@@ -52,7 +47,6 @@ import ReadwiseForm from './integrations/ReadwiseForm';
 import HardcoverForm from './integrations/HardcoverForm';
 import PageboundForm from './integrations/PageboundForm';
 import NotionForm from './integrations/NotionForm';
-import SendToReadestForm from './integrations/SendToReadestForm';
 import LocalSendForm from './integrations/LocalSendForm';
 import WebDAVForm from './integrations/WebDAVForm';
 import GoogleDriveForm from './integrations/GoogleDriveForm';
@@ -60,11 +54,7 @@ import OneDriveForm from './integrations/OneDriveForm';
 import ICloudForm from './integrations/ICloudForm';
 import S3Form from './integrations/S3Form';
 import { persistCloudProviderEnabled } from './integrations/cloudSync';
-import {
-  canToggleCloudProvider,
-  getReadestCloudRowStatus,
-  getThirdPartyRowStatus,
-} from './integrations/cloudSyncStatus';
+import { canToggleCloudProvider, getThirdPartyRowStatus } from './integrations/cloudSyncStatus';
 import {
   getCloudSyncProviders,
   isReadestCloudEnabled,
@@ -75,7 +65,7 @@ import {
 import type { FileSyncBackendKind } from '@/services/sync/file/providerRegistry';
 import { canBackendRun } from '@/services/sync/file/runLibrarySync';
 import SubPageHeader from './SubPageHeader';
-import { BoxedList, NavigationRow, SectionTitle, SettingLabel, Tips } from './primitives';
+import { SectionTitle, SettingLabel, Tips } from './primitives';
 
 type SubPage =
   | 'kosync'
@@ -85,34 +75,18 @@ type SubPage =
   | 's3'
   | 'onedrive'
   | 'icloud'
-  | 'readest-cloud'
   | 'readwise'
   | 'hardcover'
   | 'pagebound'
   | 'notion'
   | 'opds'
   | 'audiobookshelf'
-  | 'send'
   | 'localsend'
   | null;
 
-/**
- * Integrations panel — single point of discovery for external service config:
- * KOReader Sync, Readwise, Hardcover, and OPDS Catalogs.
- *
- * Pattern: boxed list of NavigationRows. Each row pushes the panel into an
- * inline sub-page (with breadcrumb back-navigation matching the Dictionaries
- * pattern) — no nested modals.
- *
- * TODO(design-system): Once we extract BoxedList / NavigationRow primitives,
- * this panel and CustomDictionaries should both consume them instead of
- * inlining the chassis.
- */
 const IntegrationsPanel: React.FC = () => {
   const _ = useTranslation();
-  const router = useAppRouter();
   const { envConfig, appService } = useEnv();
-  const { user } = useAuth();
   const { settings, requestedSubPage, setRequestedSubPage } = useSettingsStore();
   const opdsCatalogs = useCustomOPDSStore((s) => s.catalogs);
   const opdsCount = opdsCatalogs.filter((c) => !c.deletedAt).length;
@@ -187,15 +161,8 @@ const IntegrationsPanel: React.FC = () => {
   const toggleDiscordPresence = () => {
     const discordRichPresenceEnabled = !settings.discordRichPresenceEnabled;
     saveSysSettings(envConfig, 'discordRichPresenceEnabled', discordRichPresenceEnabled);
-    if (discordRichPresenceEnabled && !user) {
-      navigateToLogin(router);
-    }
   };
 
-  // Deep-link consumption: when a caller (e.g. OPDS browser close handler)
-  // sets `requestedSubPage` in the store before opening the dialog, drill
-  // straight into that sub-page on mount and clear the request so it doesn't
-  // stick to the next open. Recognised values match the SubPage union.
   useEffect(() => {
     if (!requestedSubPage) return;
     if (requestedSubPage === 'cloudsync') {
@@ -217,21 +184,13 @@ const IntegrationsPanel: React.FC = () => {
       requestedSubPage === 'notion' ||
       requestedSubPage === 'opds' ||
       requestedSubPage === 'audiobookshelf' ||
-      requestedSubPage === 'send' ||
       requestedSubPage === 'localsend'
     ) {
       setSubPage(requestedSubPage);
-    } else if (requestedSubPage === 'cloudsync') {
-      // Back-compat with the brief unified "Cloud Sync" page.
-      setSubPage('gdrive');
     }
     setRequestedSubPage(null);
   }, [requestedSubPage, setRequestedSubPage]);
 
-  // Sub-page wrapper matches the list-view's `my-4 w-full` so the
-  // SubPageHeader's "Integrations" label lands at the exact same Y position
-  // as the list-view's h2 — clicking a row reads as a navigation morph
-  // rather than a layout shift.
   if (subPage === 'kosync')
     return (
       <div className='my-4 w-full'>
@@ -270,11 +229,6 @@ const IntegrationsPanel: React.FC = () => {
                   provider: _('WebDAV'),
                 })}
               </li>
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
             </Tips>
           </div>
         )}
@@ -300,11 +254,6 @@ const IntegrationsPanel: React.FC = () => {
                   provider: _('Google Drive'),
                 })}
               </li>
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
             </Tips>
           </div>
         )}
@@ -324,27 +273,16 @@ const IntegrationsPanel: React.FC = () => {
         <S3Form />
         <div className='mt-5'>
           <Tips>
-            {
-              <li>
-                {_('{{provider}} keeps a full copy of your books, progress, and annotations.', {
-                  provider: _('S3-Compatible Storage'),
-                })}
-              </li>
-            }
-            {
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
-            }
-            {
-              <li>
-                {_(
-                  'Make sure the bucket exists and the credentials have read/write access before connecting.',
-                )}
-              </li>
-            }
+            <li>
+              {_('{{provider}} keeps a full copy of your books, progress, and annotations.', {
+                provider: _('S3-Compatible Storage'),
+              })}
+            </li>
+            <li>
+              {_(
+                'Make sure the bucket exists and the credentials have read/write access before connecting.',
+              )}
+            </li>
             {isWebAppPlatform() && (
               <li>
                 {_("In the browser, the bucket must allow this site's origin in its CORS policy.")}
@@ -374,11 +312,6 @@ const IntegrationsPanel: React.FC = () => {
                   provider: _('OneDrive'),
                 })}
               </li>
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
             </Tips>
           </div>
         )}
@@ -404,32 +337,9 @@ const IntegrationsPanel: React.FC = () => {
                   provider: _('iCloud'),
                 })}
               </li>
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
             </Tips>
           </div>
         )}
-      </div>
-    );
-  if (subPage === 'readest-cloud')
-    return (
-      <div className='my-4 w-full'>
-        <SubPageHeader
-          parentLabel={_('Integrations')}
-          currentLabel={_('Readest Cloud')}
-          description={_('Sync your library, reading progress, and highlights with Readest Cloud.')}
-          onBack={() => setSubPage(null)}
-        />
-        <BoxedList>
-          <NavigationRow
-            title={_('Account and Storage')}
-            status={_('Manage your plan and stored files')}
-            onClick={() => navigateToProfile(router)}
-          />
-        </BoxedList>
       </div>
     );
   if (subPage === 'readwise')
@@ -472,12 +382,6 @@ const IntegrationsPanel: React.FC = () => {
     return (
       <div className='my-4 w-full'>
         <ABSForm onBack={() => setSubPage(null)} />
-      </div>
-    );
-  if (subPage === 'send')
-    return (
-      <div className='my-4 w-full'>
-        <SendToReadestForm onBack={() => setSubPage(null)} />
       </div>
     );
 
@@ -576,11 +480,6 @@ const IntegrationsPanel: React.FC = () => {
     lastError: icloudLastError,
     syncBooks: settings.icloud?.syncBooks ?? false,
     booksBackedUpElsewhere: booksBackedUpBy('icloud'),
-  });
-  const readestStatus = getReadestCloudRowStatus(_, {
-    signedIn: !!user,
-    planLoading: userProfilePlan === undefined,
-    enabled: readestEnabled,
   });
 
   const toggleCloudProvider = async (kind: CloudSyncProviderKind, next: boolean) => {
@@ -688,16 +587,6 @@ const IntegrationsPanel: React.FC = () => {
             role='group'
             aria-label={_('Cloud sync providers')}
           >
-            <CloudProviderRow
-              icon={RiCloudFill}
-              title={_('Readest Cloud')}
-              status={readestStatus}
-              checked={!!user && readestEnabled}
-              canToggle={!!user}
-              onToggle={(next) => toggleCloudProvider('readest', next)}
-              onOpen={() => (user ? setSubPage('readest-cloud') : navigateToLogin(router))}
-              toggleLabel={_('Sync with Readest Cloud')}
-            />
             {/* Third-party cloud storage providers */}
             {(appService?.isDesktopApp ||
               appService?.isAndroidApp ||
@@ -788,11 +677,6 @@ const IntegrationsPanel: React.FC = () => {
                   'Library sync is off. Your books, progress, and annotations stay on this device.',
                 )}
               </li>
-              <li>
-                {_(
-                  'App settings, reading statistics, and dictionaries still sync through your Readest account while signed in.',
-                )}
-              </li>
             </Tips>
           </div>
         )}
@@ -813,12 +697,6 @@ const IntegrationsPanel: React.FC = () => {
               title={_('Audiobookshelf')}
               status={absStatus}
               onClick={() => setSubPage('audiobookshelf')}
-            />
-            <IntegrationRow
-              icon={RiSendPlaneLine}
-              title={_('Send to Readest')}
-              status={_('Email books to your library')}
-              onClick={() => setSubPage('send')}
             />
           </div>
         </div>

@@ -158,8 +158,14 @@ const syncOnce = async (makeDeps: () => Promise<VocabularySyncDeps | null>) => {
   }
 };
 
-/** Push local changes, then pull remote ones. Skipped when signed out or the category is off. */
+/** Push local changes, then pull remote ones. Disabled: no official Readest Cloud. */
 export const syncVocabulary = (
+  _makeDeps: () => Promise<VocabularySyncDeps | null> = defaultDeps,
+): Promise<void> => {
+  return Promise.resolve();
+};
+
+export const _unusedSyncVocabulary = (
   makeDeps: () => Promise<VocabularySyncDeps | null> = defaultDeps,
 ): Promise<void> => {
   if (inFlight) {
@@ -183,10 +189,13 @@ let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let subscribed = false;
 
 /**
- * Start syncing for this app session: one sync now, then a debounced sync
- * after every local change. Safe to call more than once.
+ * Disabled: no official Readest Cloud.
  */
 export const initVocabularySync = (): void => {
+  return;
+};
+
+export const _unusedInitVocabularySync = (): void => {
   void syncVocabulary();
   if (subscribed) return;
   subscribed = true;

@@ -1,7 +1,6 @@
 import clsx from 'clsx';
 import React, { useEffect } from 'react';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { BiMoon, BiSun } from 'react-icons/bi';
 import { PiGear, PiChartBar } from 'react-icons/pi';
 import { TbSunMoon } from 'react-icons/tb';
@@ -9,7 +8,6 @@ import { MdZoomOut, MdZoomIn, MdCheck, MdInfoOutline, MdOutlineSensors } from 'r
 import { MdRemove, MdAdd, MdContrast } from 'react-icons/md';
 import { MdSync, MdSyncProblem } from 'react-icons/md';
 import { IoMdExpand } from 'react-icons/io';
-import { IoShareOutline } from 'react-icons/io5';
 import { setReadingStatsDialogVisible } from '@/components/stats/ReadingStatsDialog';
 import { TbArrowAutofitWidth } from 'react-icons/tb';
 import { TbColumns1, TbColumns2 } from 'react-icons/tb';
@@ -24,7 +22,6 @@ import {
   CONTRAST_STEP,
 } from '@/services/constants';
 import { useEnv } from '@/context/EnvContext';
-import { useAuth } from '@/context/AuthContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useReaderStore } from '@/store/readerStore';
 import { useBookDataStore } from '@/store/bookDataStore';
@@ -32,7 +29,6 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useCloudSyncStatus } from '@/hooks/useCloudSyncStatus';
 import { getStyles } from '@/utils/style';
-import { navigateToLogin } from '@/utils/nav';
 import { getScrollGapAttr } from '@/utils/webtoon';
 import { applyPageTurnAttributes } from '@/app/reader/hooks/useCapturedTurn';
 import { eventDispatcher } from '@/utils/event';
@@ -56,12 +52,10 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
   onShowMetaHashDialog,
 }) => {
   const _ = useTranslation();
-  const router = useRouter();
-  const { user } = useAuth();
   const { envConfig, appService } = useEnv();
   const { getConfig, getBookData } = useBookDataStore();
-  const { setSettingsDialogOpen, setSettingsDialogBookKey } = useSettingsStore();
-  const { getView, getViewSettings, getViewState, getProgress, setViewSettings, recreateViewer } =
+  const { setSettingsDialogOpen, setSettingsDialogBookKey, setRequestedPanel } = useSettingsStore();
+  const { getView, getViewSettings, getViewState, setViewSettings, recreateViewer } =
     useReaderStore();
   const config = getConfig(bookKey)!;
   const bookData = getBookData(bookKey)!;
@@ -157,30 +151,22 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
   const syncStatus = useCloudSyncStatus(nativeLastSyncTime, bookKey);
 
   const handleSync = () => {
-    // Only Readest Cloud needs an account. With a third-party backend
-    // configured the row must sync, not bounce the user to a login they do not
-    // need (#5910).
-    if (syncStatus.needsSignIn) {
-      navigateToLogin(router);
+    if (syncStatus.providers.length === 0) {
       setIsDropdownOpen?.(false);
+      setSettingsDialogBookKey(bookKey);
+      setRequestedPanel('integrations');
+      setSettingsDialogOpen(true);
       return;
     }
-    // One tap, every provider the user selected. Before #5910 this dispatched
-    // `sync-book-progress` alone, which only useProgressSync (Readest Cloud)
-    // and useHardcoverSync listen for — so for a third-party-only user the row
-    // did nothing at all.
     eventDispatcher.dispatch('sync-book-progress', { bookKey });
     eventDispatcher.dispatch('flush-notion-sync', { bookKey });
     eventDispatcher.dispatch('push-file-sync', { bookKey });
     eventDispatcher.dispatch('pull-file-sync', { bookKey });
     eventDispatcher.dispatch('flush-kosync', { bookKey });
-    // A tap is a manual sync, so Hardcover pushes even with its Auto Sync off.
     if (syncStatus.providers.some((p) => p.kind === 'hardcover')) {
       eventDispatcher.dispatch('hardcover-push-progress', { bookKey, silent: true });
       eventDispatcher.dispatch('hardcover-push-notes', { bookKey, silent: true });
     }
-    // BookOrbit may be in manual mode (#6029), where nothing is ever pending
-    // and the flush above does nothing, so ask it for a real push.
     eventDispatcher.dispatch('push-kosync', { bookKey, provider: 'bookorbit' });
   };
 
@@ -192,16 +178,6 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
   const toggleAutoScroll = () => {
     setIsDropdownOpen?.(false);
     eventDispatcher.dispatch('autoscroll-toggle', { bookKey });
-  };
-
-  const handleShare = () => {
-    setIsDropdownOpen?.(false);
-    if (!bookData?.book) return;
-    const progress = getProgress(bookKey);
-    eventDispatcher.dispatch('show-share-dialog', {
-      book: bookData.book,
-      cfi: progress?.location ?? null,
-    });
   };
 
   useEffect(() => {
@@ -606,10 +582,8 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
               ? _('Synced via {{provider}}', { provider: syncStatus.providers[0].name })
               : undefined
         }
-        Icon={syncStatus.needsSignIn || syncStatus.failed ? MdSyncProblem : MdSync}
-        iconClassName={
-          syncStatus.syncing || (user && viewState?.syncing) ? 'animate-reverse-spin' : ''
-        }
+        Icon={syncStatus.failed ? MdSyncProblem : MdSync}
+        iconClassName={syncStatus.syncing || viewState?.syncing ? 'animate-reverse-spin' : ''}
         onClick={handleSync}
         siblings={
           <button
@@ -654,9 +628,6 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
       />
       <MenuItem label={_('Reading Statistics')} Icon={PiChartBar} onClick={openReadingStats} />
       <MenuItem label={_('Settings')} Icon={PiGear} onClick={openSettingsDialog} />
-      <hr aria-hidden='true' className='border-base-300 my-1' />
-
-      <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />
     </Menu>
   );
 };

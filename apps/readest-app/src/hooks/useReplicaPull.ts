@@ -666,7 +666,12 @@ const installAutoSyncListeners = (service: AppService, envConfig: EnvConfigType)
  * sync singleton, and stay attached after subsequent unmounts so a
  * long-lived tab keeps catching up across other devices' edits.
  */
-export const useReplicaPull = ({
+export const useReplicaPull = (_opts: UseReplicaPullOpts): void => {
+  // Disabled: no official Readest Cloud replica sync.
+  return;
+};
+
+export const _unusedUseReplicaPull = ({
   kinds,
   delayMs = REPLICA_PULL_DEFAULT_DELAY_MS,
 }: UseReplicaPullOpts): void => {

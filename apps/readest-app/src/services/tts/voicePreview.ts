@@ -1,7 +1,5 @@
 import { EdgeSpeechTTS } from '@/libs/edgeTTS';
-import { isTauriAppPlatform } from '@/services/environment';
 import type { CustomTTSService } from '@/types/customTTS';
-import { getAccessToken } from '@/utils/access';
 import { NativeTTSClient } from './NativeTTSClient';
 import {
   CUSTOM_TTS_PROVIDER_ID,
@@ -117,17 +115,9 @@ const playAudio = (data: ArrayBuffer, signal: AbortSignal, onStart: () => void) 
     });
   });
 
-// The free wss transport is blocked on some networks; signed-in web readers
-// fall back to the proxy route, as reading does (EdgeTTSClient.init).
 const synthesizeEdge = async ({ voiceId, lang, text }: VoicePreview) => {
   const payload = { lang, text, voice: voiceId, rate: 1, pitch: 1 };
-  try {
-    return (await new EdgeSpeechTTS('wss').createAudioData(payload)).data;
-  } catch (error) {
-    if (isTauriAppPlatform()) throw error;
-    if (!(await getAccessToken())) throw new Error('NOT_AUTHENTICATED');
-    return (await new EdgeSpeechTTS('https').createAudioData(payload)).data;
-  }
+  return (await new EdgeSpeechTTS('wss').createAudioData(payload)).data;
 };
 
 // Held while speaking: Chrome may collect an utterance mid-speech and never
