@@ -1,0 +1,115 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK (arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;28.2.13676358"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-android-arm64-cargo
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline
+
+      - name: Setup vendor assets
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: Prepare Android project & signing keystore
+        run: |
+          cd apps/readest-app
+          rm -rf src-tauri/gen/android
+          pnpm tauri android init
+          pnpm tauri icon ../../data/icons/readest-book.png
+          git checkout .
+
+          KEYSTORE_PATH="$RUNNER_TEMP/readest-release.jks"
+          keytool -genkeypair -v \
+            -keystore "$KEYSTORE_PATH" \
+            -alias readest \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass readest123 \
+            -keypass readest123 \
+            -dname "CN=Readest, OU=Dev, O=Readest, L=Local, S=Local, C=US"
+
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          keyAlias=readest
+          password=readest123
+          storeFile=$KEYSTORE_PATH
+          EOF
+
+      - name: Build Android APK with Tauri
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+        run: |
+          cd apps/readest-app
+          mkdir -p build-output
+          dotenv -e .env.tauri -- pnpm tauri android build -t aarch64
+
+          APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found APK: $APK_FILE"
+          if [ -z "$APK_FILE" ]; then
+            echo "Error: No APK file found!"
+            find src-tauri/gen/android/app/build/outputs || true
+            exit 1
+          fi
+          cp "$APK_FILE" build-output/Readest_arm64.apk
+          ls -lh build-output/Readest_arm64.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Readest-Android-arm64-apk
+          path: apps/readest-app/build-output/Readest_arm64.apk
+          if-no-files-found: error
