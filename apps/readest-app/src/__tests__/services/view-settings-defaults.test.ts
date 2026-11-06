@@ -48,6 +48,25 @@ describe('view settings defaults', () => {
     expect((await loadBookConfig(fs, book, settings)).viewSettings?.spreadMode).toBe('none');
   });
 
+  it('applies mobile phone view settings defaults on non-tablet mobile devices', () => {
+    const settings = getDefaultViewSettings({
+      fs: {} as FileSystem,
+      isDesktopApp: false,
+      isMobile: true,
+      isTablet: false,
+      isEink: false,
+      isAppDataSandbox: false,
+    });
+    expect(settings.defaultFontSize).toBe(22);
+    expect(settings.marginTopPx).toBe(44);
+    expect(settings.marginBottomPx).toBe(44);
+    expect(settings.marginLeftPx).toBe(24);
+    expect(settings.marginRightPx).toBe(24);
+    expect(settings.compactMarginLeftPx).toBe(24);
+    expect(settings.compactMarginRightPx).toBe(24);
+    expect(settings.gapPercent).toBe(8);
+  });
+
   it('applies tablet view settings defaults on tablet devices', () => {
     const settings = getDefaultViewSettings({
       fs: {} as FileSystem,

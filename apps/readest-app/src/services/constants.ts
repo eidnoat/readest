@@ -458,6 +458,14 @@ export const DEFAULT_MOBILE_VIEW_SETTINGS: Partial<ViewSettings> = {
   defaultFont: 'Sans-serif',
   disableDoubleClick: true,
   spreadMode: 'none',
+  defaultFontSize: 22,
+  marginTopPx: 44,
+  marginBottomPx: 44,
+  marginLeftPx: 24,
+  marginRightPx: 24,
+  compactMarginLeftPx: 24,
+  compactMarginRightPx: 24,
+  gapPercent: 8,
 };
 
 export const DEFAULT_TABLET_VIEW_SETTINGS: Partial<ViewSettings> = {
