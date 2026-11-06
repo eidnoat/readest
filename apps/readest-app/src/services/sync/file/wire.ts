@@ -1,5 +1,7 @@
 import type { TTSPacks } from '@/utils/ttsPacks';
 import { Book, BookConfig, BookNote } from '@/types/book';
+import type { BookshelfState } from '@/types/bookshelf';
+import type { OPDSCatalog } from '@/types/opds';
 
 /**
  * Per-book remote payload stored at
@@ -142,6 +144,10 @@ export interface RemoteLibraryIndex {
    * client (same optional + additive self-healing contract as uploadedHashes).
    */
   emptyDirs?: string[];
+  /** Bookshelf states synchronized across devices. */
+  bookshelves?: BookshelfState;
+  /** OPDS catalogs synchronized across devices. */
+  opdsCatalogs?: OPDSCatalog[];
 }
 
 export const parseRemoteLibraryIndex = (raw: string | null): RemoteLibraryIndex | null => {

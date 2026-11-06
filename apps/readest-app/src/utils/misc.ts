@@ -78,6 +78,13 @@ export const getOSPlatform = (): OsPlatform => {
 
   if (/iphone|ipad|ipod/.test(userAgent)) return 'ios';
   if (userAgent.includes('android')) return 'android';
+  if (
+    (userAgent.includes('macintosh') || userAgent.includes('mac os x')) &&
+    typeof navigator !== 'undefined' &&
+    navigator.maxTouchPoints > 1
+  ) {
+    return 'ios';
+  }
   if (userAgent.includes('macintosh') || userAgent.includes('mac os x')) return 'macos';
   if (userAgent.includes('windows nt')) return 'windows';
   if (userAgent.includes('linux')) return 'linux';

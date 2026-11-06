@@ -1,4 +1,6 @@
 import { Book, BookConfig } from '@/types/book';
+import type { BookshelfState } from '@/types/bookshelf';
+import type { OPDSCatalog } from '@/types/opds';
 
 /** A buffered file payload + its byte length (for the HEAD-vs-local probe). */
 export interface BookBytes {
@@ -67,4 +69,14 @@ export interface LocalStore {
    * never touched — only the app-managed `Books/<hash>/` copy is removed.
    */
   deleteBookLocally(book: Book): Promise<void>;
+
+  /** Load local bookshelf configurations, or null if none. */
+  loadBookshelves?(): Promise<BookshelfState | null>;
+  /** Save merged bookshelf state to local storage. */
+  saveBookshelves?(state: BookshelfState): Promise<void>;
+
+  /** Load local OPDS catalogs. */
+  loadOPDSCatalogs?(): Promise<OPDSCatalog[]>;
+  /** Save merged OPDS catalogs to local storage. */
+  saveOPDSCatalogs?(catalogs: OPDSCatalog[]): Promise<void>;
 }

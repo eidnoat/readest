@@ -1,4 +1,8 @@
 import { Book, BookConfig, BookNote } from '@/types/book';
+import type { BookshelfState } from '@/types/bookshelf';
+import type { OPDSCatalog } from '@/types/opds';
+import { mergeBookshelfStates } from '@/services/bookshelves/state';
+import { computeOpdsCatalogContentId } from '@/services/sync/adapters/opdsCatalog';
 import type { ProgressHandler } from '@/utils/transfer';
 import { isAudiobook } from '@/utils/audiobook';
 import { FileHead, FileSyncError, FileSyncProvider } from './provider';
@@ -33,6 +37,47 @@ import {
 } from './merge';
 
 export type SyncStrategy = 'silent' | 'send' | 'receive';
+
+/**
+ * Merge local and remote OPDS catalogs using Last-Writer-Wins on timestamp,
+ * preserving existing credentials when incoming updates omit them.
+ */
+export const mergeOPDSCatalogs = (local: OPDSCatalog[], remote: OPDSCatalog[]): OPDSCatalog[] => {
+  const resultByKey = new Map<string, OPDSCatalog>();
+  const getKey = (c: OPDSCatalog) => c.contentId ?? computeOpdsCatalogContentId(c.url);
+
+  for (const c of local) {
+    resultByKey.set(getKey(c), { ...c });
+  }
+
+  for (const r of remote) {
+    const key = getKey(r);
+    const existing = resultByKey.get(key);
+    if (!existing) {
+      resultByKey.set(key, { ...r });
+      continue;
+    }
+
+    const localTime = existing.updatedAt ?? existing.addedAt ?? 0;
+    const remoteTime = r.updatedAt ?? r.addedAt ?? 0;
+
+    if (remoteTime > localTime) {
+      resultByKey.set(key, {
+        ...r,
+        username: r.username ?? existing.username,
+        password: r.password ?? existing.password,
+      });
+    } else {
+      resultByKey.set(key, {
+        ...existing,
+        username: existing.username ?? r.username,
+        password: existing.password ?? r.password,
+      });
+    }
+  }
+
+  return Array.from(resultByKey.values());
+};
 
 export interface PullResult {
   /** True when the remote had a config and we merged something into local. */
@@ -624,6 +669,36 @@ export class FileSyncEngine {
           fingerprint,
           index: structuredClone(remoteIndex),
         });
+      }
+    }
+
+    // Sync bookshelves and OPDS catalogs from remote index if available
+    if (canPull && remoteIndex) {
+      if (remoteIndex.bookshelves && this.store.loadBookshelves && this.store.saveBookshelves) {
+        try {
+          const localBookshelves = await this.store.loadBookshelves();
+          const mergedBookshelves = mergeBookshelfStates(
+            localBookshelves ?? undefined,
+            remoteIndex.bookshelves,
+          );
+          if (JSON.stringify(mergedBookshelves) !== JSON.stringify(localBookshelves)) {
+            await this.store.saveBookshelves(mergedBookshelves);
+          }
+        } catch (e) {
+          console.warn('file sync: failed to merge bookshelves', e);
+        }
+      }
+
+      if (remoteIndex.opdsCatalogs && this.store.loadOPDSCatalogs && this.store.saveOPDSCatalogs) {
+        try {
+          const localCatalogs = (await this.store.loadOPDSCatalogs()) ?? [];
+          const mergedCatalogs = mergeOPDSCatalogs(localCatalogs, remoteIndex.opdsCatalogs);
+          if (JSON.stringify(mergedCatalogs) !== JSON.stringify(localCatalogs)) {
+            await this.store.saveOPDSCatalogs(mergedCatalogs);
+          }
+        } catch (e) {
+          console.warn('file sync: failed to merge opds catalogs', e);
+        }
       }
     }
 
@@ -1326,6 +1401,30 @@ export class FileSyncEngine {
       });
       const { uploadedHashes: nextUploadedHashes, emptyDirs: nextEmptyDirs } = buildRecords();
 
+      let finalBookshelves: BookshelfState | undefined = undefined;
+      let finalCatalogs: OPDSCatalog[] | undefined = undefined;
+      if (canPush) {
+        if (this.store.loadBookshelves) {
+          const curBs = await this.store.loadBookshelves();
+          finalBookshelves = mergeBookshelfStates(curBs ?? undefined, remoteIndex?.bookshelves);
+        } else if (remoteIndex?.bookshelves) {
+          finalBookshelves = remoteIndex.bookshelves;
+        }
+
+        if (this.store.loadOPDSCatalogs) {
+          const curCats = (await this.store.loadOPDSCatalogs()) ?? [];
+          finalCatalogs = mergeOPDSCatalogs(curCats, remoteIndex?.opdsCatalogs ?? []);
+        } else if (remoteIndex?.opdsCatalogs) {
+          finalCatalogs = remoteIndex.opdsCatalogs;
+        }
+      }
+
+      const bookshelvesDirty =
+        JSON.stringify(finalBookshelves?.rows ?? null) !==
+        JSON.stringify(remoteIndex?.bookshelves?.rows ?? null);
+      const opdsDirty =
+        JSON.stringify(finalCatalogs ?? []) !== JSON.stringify(remoteIndex?.opdsCatalogs ?? []);
+
       // Skip the re-push when the rebuilt index is semantically identical to
       // the pulled one: a restamped byte-copy only churns the remote and
       // invalidates every other device's etag-based change detection. The
@@ -1333,6 +1432,8 @@ export class FileSyncEngine {
       // record change, or local row the remote lacks (or trails) pushes.
       const indexDirty =
         remoteIndex === null ||
+        bookshelvesDirty ||
+        opdsDirty ||
         syncedHashes.size > 0 ||
         result.failures > 0 ||
         !sameStringSet(nextUploadedHashes, remoteIndex.uploadedHashes ?? []) ||
@@ -1386,6 +1487,12 @@ export class FileSyncEngine {
               // competing entry.
               if (!confirmedNonEmptyDirs.has(hash)) emptyDirs.add(hash);
             }
+            if (fresh?.bookshelves) {
+              finalBookshelves = mergeBookshelfStates(finalBookshelves, fresh.bookshelves);
+            }
+            if (fresh?.opdsCatalogs) {
+              finalCatalogs = mergeOPDSCatalogs(finalCatalogs ?? [], fresh.opdsCatalogs);
+            }
           }
           const merged = buildRecords();
 
@@ -1395,6 +1502,8 @@ export class FileSyncEngine {
             updatedAt: Date.now(),
             uploadedHashes: merged.uploadedHashes,
             emptyDirs: merged.emptyDirs,
+            bookshelves: finalBookshelves,
+            opdsCatalogs: finalCatalogs && finalCatalogs.length > 0 ? finalCatalogs : undefined,
           };
           await this.pushLibraryIndex(newIndex);
           // Our own push changed the remote etag; drop the cached snapshot so

@@ -155,6 +155,7 @@ export const useCustomOPDSStore = create<OPDSStoreState>((set, get) => ({
       allowSelfSignedCert: input.allowSelfSignedCert ?? true,
       contentId,
       addedAt: input.addedAt ?? existing?.addedAt ?? Date.now(),
+      updatedAt: Date.now(),
       deletedAt: undefined,
       reincarnation,
     };
@@ -177,7 +178,7 @@ export const useCustomOPDSStore = create<OPDSStoreState>((set, get) => ({
       if (idx < 0) return state;
       const old = state.catalogs[idx]!;
       if (old.deletedAt) return state;
-      updated = { ...old, ...patch };
+      updated = { ...old, ...patch, updatedAt: Date.now() };
       // Recompute contentId only if the URL itself changed; otherwise
       // preserve the existing one so we keep the same server row.
       if (patch.url && patch.url !== old.url) {
@@ -194,8 +195,11 @@ export const useCustomOPDSStore = create<OPDSStoreState>((set, get) => ({
   removeCatalog: (id) => {
     const catalog = get().catalogs.find((c) => c.id === id);
     if (!catalog) return false;
+    const now = Date.now();
     set((state) => ({
-      catalogs: state.catalogs.map((c) => (c.id === id ? { ...c, deletedAt: Date.now() } : c)),
+      catalogs: state.catalogs.map((c) =>
+        c.id === id ? { ...c, deletedAt: now, updatedAt: now } : c,
+      ),
     }));
     if (catalog.contentId) publishOpdsDelete(catalog.contentId);
     return true;
@@ -209,11 +213,12 @@ export const useCustomOPDSStore = create<OPDSStoreState>((set, get) => ({
     const trailing = visible.filter((c) => !leadingIds.has(c.id)).sort(compareForDisplay);
     const nextOrder = new Map([...leading, ...trailing].map((c, i) => [c.id, i]));
 
+    const now = Date.now();
     const updated: OPDSCatalog[] = [];
     const catalogs = get().catalogs.map((c) => {
       const order = nextOrder.get(c.id);
       if (order === undefined || c.sortOrder === order) return c;
-      const next = { ...c, sortOrder: order };
+      const next = { ...c, sortOrder: order, updatedAt: now };
       updated.push(next);
       return next;
     });
@@ -289,11 +294,10 @@ export const useCustomOPDSStore = create<OPDSStoreState>((set, get) => ({
     try {
       const { settings, setSettings, saveSettings } = useSettingsStore.getState();
       const { catalogs } = get();
-      // Tombstoned entries stay in memory so the orchestrator can detect
-      // re-import / reincarnation, but they're stripped at the
-      // persistence boundary. The next pull will mirror server-side
-      // tombstones back into memory if the row is still deleted.
-      settings.opdsCatalogs = catalogs.filter((c) => !c.deletedAt);
+      // Keep live entries and recent tombstones (within 30 days) so deletions
+      // replicate cleanly across devices via third-party sync.
+      const thirtyDaysAgo = Date.now() - 30 * 86400_000;
+      settings.opdsCatalogs = catalogs.filter((c) => !c.deletedAt || c.deletedAt > thirtyDaysAgo);
       setSettings(settings);
       saveSettings(_envConfig, settings);
     } catch (error) {

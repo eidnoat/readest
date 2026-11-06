@@ -39,7 +39,7 @@ import {
 } from '@/types/system';
 import type { Book } from '@/types/book';
 import { needsQueryRangeReads } from '@/utils/ua';
-import { getOSPlatform, isContentURI, isFileURI, isValidURL } from '@/utils/misc';
+import { isContentURI, isFileURI, isValidURL } from '@/utils/misc';
 import { getDirPath, getFilename, getPathFilename, getURLFilename } from '@/utils/path';
 import { NativeFile, RemoteFile } from '@/utils/file';
 import {
@@ -608,7 +608,8 @@ export class NativeAppService extends BaseAppService {
     !window.__READEST_UPDATER_DISABLED;
   // orientation lock is not supported on iPad
   override hasOrientationLock =
-    (OS_TYPE === 'ios' && getOSPlatform() === 'ios') || OS_TYPE === 'android';
+    (OS_TYPE === 'ios' && /iphone|ipod/.test(navigator.userAgent.toLowerCase())) ||
+    OS_TYPE === 'android';
   override hasScreenBrightness = OS_TYPE === 'ios' || OS_TYPE === 'android';
   override hasAmbientLightSensor = false;
   override hasIAP = OS_TYPE === 'ios' || (OS_TYPE === 'android' && DIST_CHANNEL === 'playstore');

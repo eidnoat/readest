@@ -46,6 +46,8 @@ export interface OPDSCatalog {
   contentId?: string;
   /** Wall-clock ms of first import, used for ordering. */
   addedAt?: number;
+  /** Wall-clock ms of last update, used for LWW sync. */
+  updatedAt?: number;
   /**
    * Manual display position, stamped 0..n-1 across the visible list every
    * time the user drags a card. Absent until the first reorder — those

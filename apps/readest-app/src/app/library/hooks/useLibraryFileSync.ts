@@ -4,6 +4,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useQuotaStats } from '@/hooks/useQuotaStats';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useCustomOPDSStore } from '@/store/customOPDSStore';
 import { debounce } from '@/utils/debounce';
 import { getActiveFileSyncBackends } from '@/services/sync/cloudSyncProvider';
 import { runFileLibrarySyncPass } from '@/services/sync/file/runLibrarySync';
@@ -34,6 +35,8 @@ export const useLibraryFileSync = () => {
   const _ = useTranslation();
   const { envConfig } = useEnv();
   const settings = useSettingsStore((s) => s.settings);
+  const bookshelves = settings.bookshelves;
+  const opdsCatalogs = useCustomOPDSStore((s) => s.catalogs);
   const library = useLibraryStore((s) => s.library);
   const libraryLoaded = useLibraryStore((s) => s.libraryLoaded);
   const { userProfilePlan } = useQuotaStats();
@@ -48,10 +51,10 @@ export const useLibraryFileSync = () => {
   useEffect(() => () => debouncedSync.cancel(), [debouncedSync]);
 
   // Library changes — import (adds a row), delete (sets deletedAt), book close
-  // (bumps updatedAt) — all mutate `library`, so this single effect covers them
-  // plus the initial load pull.
+  // (bumps updatedAt), bookshelves or OPDS catalog edits — all trigger this
+  // effect to sync to custom backends.
   useEffect(() => {
     if (!hasBackends || !libraryLoaded) return;
     debouncedSync();
-  }, [library, libraryLoaded, hasBackends, debouncedSync]);
+  }, [library, libraryLoaded, hasBackends, debouncedSync, bookshelves, opdsCatalogs]);
 };

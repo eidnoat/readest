@@ -1,8 +1,7 @@
 import clsx from 'clsx';
-import { MdContentPaste, MdLanguage, MdMenuBook, MdRssFeed } from 'react-icons/md';
+import { MdMenuBook } from 'react-icons/md';
 import { LuLibrary } from 'react-icons/lu';
 import { IoFileTray } from 'react-icons/io5';
-import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
@@ -16,40 +15,20 @@ export interface ImportMenuProps {
   onImportFromWebBrowser?: () => void;
   onImportBookFromNovelUrl?: () => void;
   onOpenCatalogManager: () => void;
-  onOpenFeeds: () => void;
+  onOpenFeeds?: () => void;
 }
 
 const ImportMenu: React.FC<ImportMenuProps> = ({
   menuClassName,
   setIsDropdownOpen,
   onImportBooksFromFiles,
-  onImportPastedText,
-  onImportBooksFromDirectory,
-  onImportFromWebBrowser,
   onImportBookFromNovelUrl,
   onOpenCatalogManager,
-  onOpenFeeds,
 }) => {
   const _ = useTranslation();
-  const { appService } = useEnv();
 
   const handleImportFromFiles = () => {
     onImportBooksFromFiles();
-    setIsDropdownOpen?.(false);
-  };
-
-  const handleImportPastedText = () => {
-    onImportPastedText?.();
-    setIsDropdownOpen?.(false);
-  };
-
-  const handleImportFromDirectory = () => {
-    onImportBooksFromDirectory?.();
-    setIsDropdownOpen?.(false);
-  };
-
-  const handleImportFromWebBrowser = () => {
-    onImportFromWebBrowser?.();
     setIsDropdownOpen?.(false);
   };
 
@@ -60,11 +39,6 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
 
   const handleOpenCatalogManager = () => {
     onOpenCatalogManager();
-    setIsDropdownOpen?.(false);
-  };
-
-  const handleOpenFeeds = () => {
-    onOpenFeeds();
     setIsDropdownOpen?.(false);
   };
 
@@ -81,28 +55,6 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
         Icon={<IoFileTray className='h-5 w-5' />}
         onClick={handleImportFromFiles}
       />
-      {onImportBooksFromDirectory && (
-        <MenuItem
-          label={_('From Directory')}
-          Icon={<IoFileTray className='h-5 w-5' />}
-          onClick={handleImportFromDirectory}
-        />
-      )}
-      {onImportPastedText && (
-        <MenuItem
-          label={_('From Pasted Text')}
-          Icon={<MdContentPaste className='h-5 w-5' />}
-          onClick={handleImportPastedText}
-        />
-      )}
-      <hr aria-hidden='true' className='border-base-200 my-1' />
-      {onImportFromWebBrowser && (
-        <MenuItem
-          label={_('From Web Browser')}
-          Icon={<MdLanguage className='h-5 w-5' />}
-          onClick={handleImportFromWebBrowser}
-        />
-      )}
       {onImportBookFromNovelUrl && (
         <MenuItem
           label={_('From Web Novel')}
@@ -111,12 +63,7 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
         />
       )}
       <MenuItem
-        label={_('From Feed URL')}
-        Icon={<MdRssFeed className='h-5 w-5' />}
-        onClick={handleOpenFeeds}
-      />
-      <MenuItem
-        label={appService?.isOnlineCatalogsAccessible ? _('Online Library') : _('OPDS Catalogs')}
+        label={_('Online Library')}
         Icon={<LuLibrary className='h-5 w-5' />}
         onClick={handleOpenCatalogManager}
       />

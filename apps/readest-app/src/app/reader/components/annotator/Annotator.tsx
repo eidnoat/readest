@@ -100,7 +100,6 @@ import { vocabularyLang } from '@/services/vocabulary/entry';
 import { sentenceAt } from '@/services/vocabulary/sentence';
 import DictionarySheet from './DictionarySheet';
 import NoteEditorSheet from './NoteEditorSheet';
-import TranslatorPopup from './TranslatorPopup';
 import useShortcuts from '@/hooks/useShortcuts';
 import ProofreadPopup from './ProofreadPopup';
 import { setProofreadRulesVisibility } from '@/app/reader/components/ProofreadRules';
@@ -197,10 +196,8 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const [selection, setSelection] = useState<TextSelection | null>(null);
-  const [translationEpoch, setTranslationEpoch] = useState(0);
   const [showAnnotPopup, setShowAnnotPopup] = useState(false);
   const [showDictionaryPopup, setShowDictionaryPopup] = useState(false);
-  const [showDeepLPopup, setShowDeepLPopup] = useState(false);
   const [showProofreadPopup, setShowProofreadPopup] = useState(false);
   const [trianglePosition, setTrianglePosition] = useState<Position>();
   const [annotPopupPosition, setAnnotPopupPosition] = useState<Position>();
@@ -208,7 +205,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   // tap on a highlighted link opens both it and this toolbar (#6390).
   const [footnotePopupDir, setFootnotePopupDir] = useState<Position['dir'] | null>(null);
   const [dictPopupPosition, setDictPopupPosition] = useState<Position>();
-  const [translatorPopupPosition, setTranslatorPopupPosition] = useState<Position>();
   const [proofreadPopupPosition, setProofreadPopupPosition] = useState<Position>();
   const [highlightOptionsVisible, setHighlightOptionsVisible] = useState(false);
   const [showAnnotationNotes, setShowAnnotationNotes] = useState(false);
@@ -268,14 +264,12 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   // cleared without the dismiss that closes them: the instant highlight quick
   // action clears it on a tap (#6419). Close them in the same render, before
   // they can render without text.
-  if (!selection && (showDictionaryPopup || showDeepLPopup || showProofreadPopup)) {
+  if (!selection && (showDictionaryPopup || showProofreadPopup)) {
     setShowDictionaryPopup(false);
-    setShowDeepLPopup(false);
     setShowProofreadPopup(false);
   }
 
-  const showingPopup =
-    showAnnotPopup || showDictionaryPopup || showDeepLPopup || showProofreadPopup;
+  const showingPopup = showAnnotPopup || showDictionaryPopup || showProofreadPopup;
 
   const popupPadding = useResponsiveSize(10);
   const trianglePadding = popupPadding * 2 + 6;
@@ -286,8 +280,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   // shows all enabled providers stacked (no tabs) so it needs more vertical
   // room than the legacy single-tab layout.
   const dictPopupHeight = Math.min(360, maxHeight);
-  const transPopupWidth = Math.min(480, maxWidth);
-  const transPopupHeight = Math.min(265, maxHeight);
   const proofreadPopupWidth = Math.min(440, maxWidth);
   const proofreadPopupHeight = Math.min(200, maxHeight);
   const canShare = canShareText(appService);
@@ -389,13 +381,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       dictPopupHeight,
       popupPadding,
     );
-    const transPopupPos = getPopupPosition(
-      triangPos,
-      rect,
-      transPopupWidth,
-      transPopupHeight,
-      popupPadding,
-    );
     const proofreadPopupPos = getPopupPosition(
       triangPos,
       rect,
@@ -406,7 +391,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
     if (triangPos.point.x == 0 || triangPos.point.y == 0) return;
     setAnnotPopupPosition(offsetPosition(annotPopupPos, origin));
     setDictPopupPosition(offsetPosition(dictPopupPos, origin));
-    setTranslatorPopupPosition(offsetPosition(transPopupPos, origin));
     setProofreadPopupPosition(offsetPosition(proofreadPopupPos, origin));
     setTrianglePosition(offsetPosition(triangPos, origin));
     // Re-clamp when the cell's insets change, which only iPhone Duo uses;
@@ -522,7 +506,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       setShowAnnotationNotes(false);
       setAnnotationNotes([]);
       setShowDictionaryPopup(false);
-      setShowDeepLPopup(false);
       setShowProofreadPopup(false);
       setEditingAnnotation(null);
       setNoteEditorTarget(null);
@@ -1287,9 +1270,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
             handleShowAnnotPopup();
           }
           break;
-        case 'translate':
-          handleTranslation();
-          break;
         case 'tts':
           handleSpeakText(true);
           break;
@@ -1353,13 +1333,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
         dictPopupHeight,
         popupPadding,
       );
-      const transPopupPos = getPopupPosition(
-        triangPos,
-        rect,
-        transPopupWidth,
-        transPopupHeight,
-        popupPadding,
-      );
       const proofreadPopupPos = getPopupPosition(
         triangPos,
         rect,
@@ -1370,7 +1343,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       if (triangPos.point.x == 0 || triangPos.point.y == 0) return;
       setAnnotPopupPosition(offsetPosition(annotPopupPos, origin));
       setDictPopupPosition(offsetPosition(dictPopupPos, origin));
-      setTranslatorPopupPosition(offsetPosition(transPopupPos, origin));
       setProofreadPopupPosition(offsetPosition(proofreadPopupPos, origin));
       setTrianglePosition(offsetPosition(triangPos, origin));
 
@@ -1381,7 +1353,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       // answering it with the toolbar (or, worse, re-running the quick action)
       // closed the surface on the frame it opened (#6018). Nothing can select
       // new text while one of these is up — they all sit over the page.
-      if (showDictionaryPopup || showDeepLPopup || showProofreadPopup) return;
+      if (showDictionaryPopup || showProofreadPopup) return;
 
       const { enableAnnotationQuickActions, annotationQuickAction } = viewSettings;
       if (wantWordLensDict) {
@@ -1452,29 +1424,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       console.warn(e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress, annotationIndex, translationEpoch]);
-
-  // Translations are appended long after a section's annotations were drawn, so
-  // a highlight anchored inside translated text has nothing to attach to at
-  // draw time. Bumping this re-runs the draw effect above once the inserts
-  // settle; they arrive in bursts, hence the debounce.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const handleTranslationInserted = (event: CustomEvent) => {
-      const detail = event.detail as { bookKey: string } | undefined;
-      if (!detail || detail.bookKey !== bookKey) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        setTranslationEpoch((epoch) => epoch + 1);
-      }, 150);
-    };
-    eventDispatcher.on('translation-inserted', handleTranslationInserted);
-    return () => {
-      if (timer) clearTimeout(timer);
-      eventDispatcher.off('translation-inserted', handleTranslationInserted);
-    };
-  }, [bookKey]);
+  }, [progress, annotationIndex]);
 
   useEffect(() => {
     if (!config.booknotes || !selection?.cfi || !showAnnotationNotes) return;
@@ -1491,7 +1441,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       containerRef.current?.focus();
     }
     setShowAnnotPopup(true);
-    setShowDeepLPopup(false);
     setShowDictionaryPopup(false);
     setShowProofreadPopup(false);
   };
@@ -1976,13 +1925,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
     setShowDictionaryPopup(true);
   };
 
-  const handleTranslation = () => {
-    if (!selection || !selection.text) return;
-    setShowAnnotPopup(false);
-    void suppressNativeSelectionHandles();
-    setShowDeepLPopup(true);
-  };
-
   // `oneTime` is required rather than defaulted: it decides whether this reads
   // the selection and stops or starts an open-ended session from it, and every
   // entry point here means the former. Defaulting it silently turned Ctrl/Cmd+R
@@ -2061,11 +2003,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
       onCopySelection: () => {
         if (!selection?.text) return false;
         handleCopy(false);
-        return true;
-      },
-      onTranslateSelection: () => {
-        if (!selection?.text) return false;
-        handleTranslation();
         return true;
       },
       onDictionarySelection: () => {
@@ -2664,8 +2601,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
         return { tooltipText: _(label), Icon, onClick: handleSearch };
       case 'dictionary':
         return { tooltipText: _(label), Icon, onClick: handleDictionary };
-      case 'translate':
-        return { tooltipText: _(label), Icon, onClick: handleTranslation };
       case 'tts':
         return {
           tooltipText: _(label),
@@ -2735,8 +2670,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
   // translator, the proofreader or the note editor (#5815). They belong to the
   // toolbar: hide them while any of those is open, and let them come back with
   // the toolbar (or go with the dismiss).
-  const overlaySurfaceOpen =
-    showDictionaryPopup || showDeepLPopup || showProofreadPopup || !!noteEditorTarget;
+  const overlaySurfaceOpen = showDictionaryPopup || showProofreadPopup || !!noteEditorTarget;
 
   // Below `sm` (or short landscape) the note editor is a bottom sheet rather
   // than a popup pinned to the selection: an anchored editor would sit under
@@ -2794,17 +2728,6 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets; gridInsets?:
             />
           );
         })()}
-      {showDeepLPopup && trianglePosition && translatorPopupPosition && (
-        <TranslatorPopup
-          bookKey={bookKey}
-          text={selection?.text as string}
-          position={translatorPopupPosition}
-          trianglePosition={trianglePosition}
-          popupWidth={transPopupWidth}
-          popupHeight={transPopupHeight}
-          onDismiss={handleDismissPopupShowToolbar}
-        />
-      )}
       {noteEditorInSheet && (
         <NoteEditorSheet
           value={editedNoteText}

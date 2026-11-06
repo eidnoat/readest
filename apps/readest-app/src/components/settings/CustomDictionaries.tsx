@@ -24,19 +24,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 import { useEnv } from '@/context/EnvContext';
-import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useFileSelector } from '@/hooks/useFileSelector';
 import { useCustomDictionaryStore } from '@/store/customDictionaryStore';
-import {
-  ensureCustomTranslatorsLoaded,
-  getLLMTranslators,
-  useCustomTranslatorStore,
-} from '@/store/customTranslatorStore';
-import { isCustomTranslatorAllowed } from '@/utils/access';
 import { eventDispatcher } from '@/utils/event';
 import { evictProvider, isSystemDictionaryEnabled } from '@/services/dictionaries/registry';
-import { getContextTranslator } from '@/services/dictionaries/providers/contextProvider';
 import { BUILTIN_PROVIDER_IDS } from '@/services/dictionaries/types';
 import {
   getLookupApps,
@@ -52,14 +44,7 @@ import {
   isValidUrlTemplate,
 } from '@/services/dictionaries/webSearchTemplates';
 import SubPageHeader from './SubPageHeader';
-import {
-  BoxedList,
-  SettingsInput,
-  SettingsRow,
-  SettingsSelect,
-  SettingsSwitchRow,
-  Tips,
-} from './primitives';
+import { BoxedList, SettingsRow, SettingsSelect, SettingsSwitchRow, Tips } from './primitives';
 
 /** Dictionary popup font-size multipliers, surfaced as percentages (#4443). */
 const FONT_SCALE_OPTIONS = [
@@ -283,8 +268,6 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
     setFontScale,
     setAutoPlayPronunciation,
     setSystemDictionaryFullscreen,
-    setContextTranslatorId,
-    setContextOptions,
     addWebSearch,
     updateWebSearch,
     removeWebSearch,
@@ -298,23 +281,8 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
     void loadCustomDictionaries(envConfig)
       .then((loaded) => setDictionariesLoaded(loaded))
       .catch(() => {});
-    ensureCustomTranslatorsLoaded(envConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // The context dictionary asks one of the user's OpenAI-compatible custom
-  // translators (#5544), which are a premium feature. Subscribing to the
-  // translators re-renders the row when one is added or removed.
-  const { token } = useAuth();
-  useCustomTranslatorStore((s) => s.translators);
-  const hasPremium = isCustomTranslatorAllowed(token);
-  const llmTranslators = getLLMTranslators();
-  const contextTranslator = hasPremium ? getContextTranslator() : undefined;
-  const prompts = useCustomTranslatorStore((s) => s.prompts).filter((p) => !p.deletedAt);
-  const contextPromptId =
-    settings.contextPromptId === 'custom' || prompts.some((p) => p.id === settings.contextPromptId)
-      ? settings.contextPromptId!
-      : 'default';
 
   const { selectFiles } = useFileSelector(appService, _);
   const [importing, setImporting] = useState(false);
@@ -336,11 +304,6 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
   }, [appService?.isAndroidApp]);
   const handleFontScaleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     setFontScale(Number(e.target.value));
-    await saveCustomDictionaries(envConfig);
-  };
-
-  const handleContextTranslatorChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setContextTranslatorId(event.target.value);
     await saveCustomDictionaries(envConfig);
   };
 
@@ -476,17 +439,6 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
         continue;
       }
       if (id === BUILTIN_PROVIDER_IDS.context) {
-        rows.push({
-          id,
-          label: builtinLabel(id, _),
-          kind: 'builtin',
-          disabled: !contextTranslator,
-          reason: !hasPremium
-            ? _('Requires Readest Premium.')
-            : !contextTranslator
-              ? _('Add an OpenAI-compatible translator in Custom Translators to use it.')
-              : undefined,
-        });
         continue;
       }
       if (id.startsWith('builtin:')) {
@@ -905,86 +857,6 @@ const CustomDictionaries: React.FC<CustomDictionariesProps> = ({ onBack }) => {
                 { value: '', label: _('Default') },
                 ...lookupApps.map((app) => ({ value: lookupAppKey(app), label: app.label })),
               ]}
-            />
-          </SettingsRow>
-        </BoxedList>
-      )}
-
-      {contextTranslator && (
-        <BoxedList
-          className='mt-4'
-          title={_('Context Dictionary')}
-          description={_(
-            'Explains the selected text as it is used in the passage, in your translation target language.',
-          )}
-        >
-          <SettingsRow label={_('AI Translator')}>
-            <SettingsSelect
-              value={contextTranslator.id}
-              onChange={handleContextTranslatorChange}
-              options={llmTranslators.map((t) => ({ value: t.id, label: t.name }))}
-              ariaLabel={_('AI Translator')}
-            />
-          </SettingsRow>
-          <SettingsRow label={_('Prompt')}>
-            <SettingsSelect
-              value={contextPromptId}
-              onChange={(event) => {
-                setContextOptions({ contextPromptId: event.target.value });
-                void saveCustomDictionaries(envConfig);
-              }}
-              options={[
-                { value: 'default', label: _('Default') },
-                ...prompts.map((p) => ({ value: p.id, label: p.name })),
-                { value: 'custom', label: _('Custom Instructions') },
-              ]}
-              ariaLabel={_('Prompt')}
-            />
-          </SettingsRow>
-          {contextPromptId === 'custom' && (
-            <div className='space-y-2 py-3 pe-4'>
-              <label htmlFor='context-dictionary-instructions' className='block font-medium'>
-                {_('Dictionary Instructions')}
-              </label>
-              <textarea
-                id='context-dictionary-instructions'
-                className='textarea eink-bordered border-base-300 bg-base-100 w-full rounded-lg border text-sm'
-                rows={7}
-                value={settings.contextSystemPrompt ?? ''}
-                placeholder={_(
-                  'Explain the selected text in {{targetLang}}. Focus on historical context and word origins. Skip examples and synonyms.',
-                )}
-                onChange={(event) => {
-                  setContextOptions({ contextSystemPrompt: event.target.value });
-                  void saveCustomDictionaries(envConfig);
-                }}
-              />
-              <p className='text-base-content/65 text-[0.8em] leading-relaxed'>
-                {_(
-                  'The selected text, surrounding passage, book title, and author are included automatically. Leave blank to use the default prompt.',
-                )}
-              </p>
-              <p className='text-base-content/65 break-words text-[0.8em] leading-relaxed'>
-                {_('Variables:')}{' '}
-                <code>{'{{sourceLang}}, {{targetLang}}, {{bookTitle}}, {{bookAuthor}}'}</code>
-              </p>
-            </div>
-          )}
-          <SettingsRow label={_('Maximum Output Tokens')}>
-            <SettingsInput
-              type='number'
-              min={1}
-              step={1}
-              aria-label={_('Maximum Output Tokens')}
-              placeholder={_('Provider Default')}
-              value={settings.contextMaxOutputTokens || ''}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                if (!event.target.value || (Number.isSafeInteger(value) && value > 0)) {
-                  setContextOptions({ contextMaxOutputTokens: value });
-                  void saveCustomDictionaries(envConfig);
-                }
-              }}
             />
           </SettingsRow>
         </BoxedList>

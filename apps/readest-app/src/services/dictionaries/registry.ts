@@ -50,7 +50,7 @@ interface RegistryArgs {
 const builtinFor = (id: string): DictionaryProvider | undefined => {
   if (id === BUILTIN_PROVIDER_IDS.wiktionary) return wiktionaryProvider;
   if (id === BUILTIN_PROVIDER_IDS.wikipedia) return wikipediaProvider;
-  if (id === BUILTIN_PROVIDER_IDS.context) return contextProvider;
+  void contextProvider;
   // System dictionary is a sentinel — it has no in-popup UI. The
   // annotator handles it before reaching the popup; the registry
   // filters it out of `getEnabledProviders` so no empty tab appears.

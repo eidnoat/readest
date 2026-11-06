@@ -276,6 +276,27 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
   private var keepAlivePlayer: AVAudioPlayer?
   private var keepAliveQueuePlayer: AVQueuePlayer?
   private var keepAliveLooper: AnyObject?
+  private var ttsBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+
+  private func beginTTSBackgroundTask() {
+    guard ttsBackgroundTask == .invalid else { return }
+    ttsBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "TTSAudioPlayout") { [weak self] in
+      guard let self = self else { return }
+      if self.ttsBackgroundTask != .invalid {
+        UIApplication.shared.endBackgroundTask(self.ttsBackgroundTask)
+        self.ttsBackgroundTask = .invalid
+      }
+    }
+    keepAliveLog.log("begin background task: \(self.ttsBackgroundTask.rawValue)")
+  }
+
+  private func endTTSBackgroundTask() {
+    guard ttsBackgroundTask != .invalid else { return }
+    let task = ttsBackgroundTask
+    ttsBackgroundTask = .invalid
+    UIApplication.shared.endBackgroundTask(task)
+    keepAliveLog.log("ended background task: \(task.rawValue)")
+  }
 
   // Publishes to the MPNowPlayingSession's centers once the session is bound
   // to the real playout AVPlayer (see bindNowPlayingSession), falling back to
@@ -804,6 +825,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
     addAudioSessionObservers()
     startKeepAlive()
     registerRemoteCommands(on: activeCommandCenter())
+    beginTTSBackgroundTask()
   }
 
   private func registerRemoteCommands(on center: MPRemoteCommandCenter) {
@@ -929,6 +951,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
     UIApplication.shared.endReceivingRemoteControlEvents()
     nowPlayingSession = nil
     mediaSessionActive = false
+    endTTSBackgroundTask()
   }
 
   // MARK: - Silent keep-alive (see keepAlivePlayer)
@@ -1160,16 +1183,23 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
           self.abortPlayout()
           self.playoutSession += 1
           self.playoutPlaying = true
+          self.beginTTSBackgroundTask()
           invoke.resolve(PlayoutControlResponse(session: self.playoutSession))
         case "end-session":
           self.playoutSessionEnded = true
           // Everything may already have been skipped or finished.
           if self.playoutCurrentIndex == -1 && self.playoutQueue.isEmpty {
             self.emitPlayoutEvent("session-end")
+            if !self.mediaSessionActive {
+              self.endTTSBackgroundTask()
+            }
           }
           invoke.resolve(PlayoutControlResponse(session: nil))
         case "abort":
           self.abortPlayout()
+          if !self.mediaSessionActive {
+            self.endTTSBackgroundTask()
+          }
           invoke.resolve(PlayoutControlResponse(session: nil))
         case "pause":
           self.playoutPlaying = false
@@ -1179,6 +1209,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
         case "resume":
           self.playoutPlaying = true
           self.playoutStarted = true
+          self.beginTTSBackgroundTask()
           if self.playoutPendingAdvance {
             self.playoutPendingAdvance = false
             self.playoutAdvance()

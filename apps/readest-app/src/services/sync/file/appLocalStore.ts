@@ -1,8 +1,13 @@
 import { Book } from '@/types/book';
 import { AppService, BaseDir } from '@/types/system';
 import { SystemSettings } from '@/types/settings';
+import type { BookshelfState } from '@/types/bookshelf';
+import type { OPDSCatalog } from '@/types/opds';
 import { EnvConfigType } from '@/services/environment';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useCustomOPDSStore } from '@/store/customOPDSStore';
+import { mergeBookshelfStates } from '@/services/bookshelves/state';
 import { getCoverFilename, getLocalBookFilename } from '@/utils/book';
 import { LocalStore } from './localStore';
 
@@ -231,5 +236,28 @@ export const createAppLocalStore = ({
       useLibraryStore.getState().setLibrary(await appService.loadLibraryBooks());
     }
     await useLibraryStore.getState().updateBook(envConfig, book);
+  },
+
+  loadBookshelves: async () => {
+    return useSettingsStore.getState().settings?.bookshelves ?? null;
+  },
+
+  saveBookshelves: async (state: BookshelfState) => {
+    const { settings, setSettings, saveSettings } = useSettingsStore.getState();
+    const merged = mergeBookshelfStates(settings?.bookshelves, state);
+    const nextSettings = { ...settings, bookshelves: merged };
+    setSettings(nextSettings);
+    await saveSettings(envConfig, nextSettings);
+  },
+
+  loadOPDSCatalogs: async () => {
+    const inMemory = useCustomOPDSStore.getState().catalogs;
+    if (inMemory && inMemory.length > 0) return inMemory;
+    return useSettingsStore.getState().settings?.opdsCatalogs ?? [];
+  },
+
+  saveOPDSCatalogs: async (catalogs: OPDSCatalog[]) => {
+    useCustomOPDSStore.setState({ catalogs });
+    await useCustomOPDSStore.getState().saveCustomOPDSCatalogs(envConfig);
   },
 });

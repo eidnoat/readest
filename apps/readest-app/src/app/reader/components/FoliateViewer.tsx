@@ -101,7 +101,6 @@ import {
   sanitizeSvg,
 } from '@/services/transformers/sanitizer';
 import { lockScreenOrientation, setSelectionSuppressed } from '@/utils/bridge';
-import { useTextTranslation } from '../hooks/useTextTranslation';
 import { useBookCoverAutoSave } from '../hooks/useAutoSaveBookCover';
 import { useDiscordPresence } from '@/hooks/useDiscordPresence';
 import { manageSyntaxHighlighting } from '@/utils/highlightjs';
@@ -239,7 +238,6 @@ const FoliateViewer: React.FC<{
   const { syncState, conflictDetails, resolveWithLocal, resolveWithRemote } = useKOSync(bookKey);
   const bookOrbitSync = useKOSync(bookKey, bookOrbitProgressProvider);
   useFileSync(bookKey);
-  useTextTranslation(bookKey, viewRef.current);
 
   // Coalesce setProgress writes within a single animation frame.
   //
