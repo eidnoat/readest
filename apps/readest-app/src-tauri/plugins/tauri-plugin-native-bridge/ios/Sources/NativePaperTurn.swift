@@ -718,8 +718,6 @@ final class NativePaperView: UIView {
   private var textures: [String: MTLTexture] = [:]
   private(set) var keys: [String] = []
   private let mesh = NativePaperMesh()
-  private var vertexBuffer: MTLBuffer?
-  private var vertexBufferOffset = 0
   private var current: String?
   private var destination: String?
   private var forward = true
@@ -743,7 +741,6 @@ final class NativePaperView: UIView {
     metalLayer.framebufferOnly = true
     // Each frame commits with the transaction that shows or hides the sheet.
     metalLayer.presentsWithTransaction = true
-    vertexBuffer = gpu.device.makeBuffer(length: 128 * 1024, options: .storageModeShared)
   }
 
   required init?(coder: NSCoder) { nil }
@@ -912,7 +909,6 @@ final class NativePaperView: UIView {
     var page = SIMD2<Float>(Float(pixelsWide), Float(pixelsHigh))
     encoder.setVertexBytes(&page, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
     encoder.setFragmentBytes(&page, length: MemoryLayout<SIMD2<Float>>.size, index: 1)
-    vertexBufferOffset = 0
     let base = forward ? destination : current
     let sheet = forward ? current : destination
     let pose = forward ? progress : 1 - progress
@@ -926,8 +922,9 @@ final class NativePaperView: UIView {
       try drawPage(encoder, sheet, pose, grabY)
     }
     encoder.endEncoding()
-    commands.present(drawable)
     commands.commit()
+    commands.waitUntilScheduled()
+    drawable.present()
   }
 
   /// Render one textured sheet. A spread sheet turns only its outer column;
@@ -939,19 +936,13 @@ final class NativePaperView: UIView {
     guard let key, let texture = textures[key] else { return }
     let backTexture = back.flatMap { textures[$0] }
     guard mesh.build(pixelsWide, pixelsHigh, p, y, rtl, spreadColumns) > 0 else { return }
-    let byteCount = mesh.count * 4
-    if vertexBuffer == nil || vertexBuffer!.length < vertexBufferOffset + byteCount {
-      vertexBuffer = gpu.device.makeBuffer(
-        length: max(128 * 1024, vertexBufferOffset + byteCount), options: .storageModeShared)
-    }
-    guard let buffer = vertexBuffer else { throw PaperError("Cannot allocate native paper mesh") }
-    let offset = vertexBufferOffset
-    vertexBufferOffset += ((byteCount + 255) / 256) * 256
-    mesh.vertices.withUnsafeBytes { raw in
-      buffer.contents().advanced(by: offset).copyMemory(from: raw.baseAddress!, byteCount: byteCount)
-    }
+    guard
+      let vertices = mesh.vertices.withUnsafeBytes({
+        gpu.device.makeBuffer(bytes: $0.baseAddress!, length: mesh.count * 4)
+      })
+    else { throw PaperError("Cannot allocate native paper mesh") }
     var spread: Float = backTexture != nil ? 1 : 0
-    encoder.setVertexBuffer(buffer, offset: offset, index: 0)
+    encoder.setVertexBuffer(vertices, offset: 0, index: 0)
     encoder.setFragmentBytes(&spread, length: MemoryLayout<Float>.size, index: 0)
     encoder.setFragmentTexture(texture, index: 0)
     encoder.setFragmentTexture(backTexture ?? texture, index: 1)

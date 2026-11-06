@@ -341,6 +341,23 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
   override init() {
     super.init()
     synthesizer.delegate = self
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleAppDidEnterBackground),
+      name: UIApplication.didEnterBackgroundNotification,
+      object: nil
+    )
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  @objc private func handleAppDidEnterBackground() {
+    if mediaSessionActive || playoutPlaying || synthesizer.isSpeaking {
+      beginTTSBackgroundTask()
+      reassertAudioSessionIfNeeded()
+    }
   }
 
   // MARK: - Lifecycle
@@ -375,6 +392,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
       invoke.resolve(SpeakResponse(utteranceId: utteranceId))
 
       DispatchQueue.main.async {
+        self.beginTTSBackgroundTask()
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = self.avRate(from: rate)
         utterance.pitchMultiplier = self.avPitch(from: pitch)
@@ -761,6 +779,18 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
     case .began:
       if withinSessionOpWindow() {
         keepAliveLog.log("interruption began IGNORED (self-inflicted session op)")
+        return
+      }
+      if let wasSuspended = info[AVAudioSessionInterruptionWasSuspendedKey] as? Bool, wasSuspended {
+        keepAliveLog.log("interruption began IGNORED (app was suspended/backgrounded)")
+        return
+      }
+      if #available(iOS 14.5, *),
+        let reasonRaw = info[AVAudioSessionInterruptionReasonKey] as? UInt,
+        let reason = AVAudioSession.InterruptionReason(rawValue: reasonRaw),
+        reason == .sceneWasBackgrounded || reason == .appWasSuspended
+      {
+        keepAliveLog.log("interruption began IGNORED (reason: \(reasonRaw))")
         return
       }
       interruptionForwarded = true
@@ -1163,7 +1193,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
   private var playoutStarted = false
   private var playoutSessionEnded = false
   private var playoutPendingAdvance = false
-  private var playoutGapTimer: Timer?
+  private var playoutGapWorkItem: DispatchWorkItem?
   private var playoutItemEndObserver: NSObjectProtocol?
   // Path of the continuous file currently loaded via "load" (Media Overlay),
   // with its byte window when it plays one.
@@ -1302,7 +1332,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
                 index: args.index, url: url, gapSec: (args.gapMs ?? 0) / 1000.0,
                 endSec: endSec, owned: true))
             if self.playoutPlaying && self.playoutCurrentIndex == -1
-              && self.playoutGapTimer == nil
+              && self.playoutGapWorkItem == nil
             {
               self.playoutAdvance()
             }
@@ -1329,8 +1359,8 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
   ) -> Bool {
     // A prior Edge queue would fight continuous playback; clear it without
     // tearing down the session id the JS side is bound to.
-    playoutGapTimer?.invalidate()
-    playoutGapTimer = nil
+    playoutGapWorkItem?.cancel()
+    playoutGapWorkItem = nil
     playoutPendingAdvance = false
     for item in playoutQueue where item.owned {
       try? FileManager.default.removeItem(at: item.url)
@@ -1517,8 +1547,8 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
   }
 
   private func playoutAdvance() {
-    playoutGapTimer?.invalidate()
-    playoutGapTimer = nil
+    playoutGapWorkItem?.cancel()
+    playoutGapWorkItem = nil
     guard !playoutQueue.isEmpty else {
       playoutCurrentIndex = -1
       if playoutSessionEnded {
@@ -1567,19 +1597,22 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
       try? FileManager.default.removeItem(at: item.url)
     }
     playoutCurrentIndex = -1
-    // Inter-sentence gap runs on a native timer so it keeps ticking when the
-    // webview's JS timers are throttled in the background.
+    // Inter-sentence gap runs on a GCD work item so it keeps ticking when the
+    // webview's JS timers and UI run loop timers are throttled in the background.
+    playoutGapWorkItem?.cancel()
+    playoutGapWorkItem = nil
     if item.gapSec > 0 {
-      playoutGapTimer = Timer.scheduledTimer(withTimeInterval: item.gapSec, repeats: false) {
-        [weak self] _ in
+      let workItem = DispatchWorkItem { [weak self] in
         guard let self = self else { return }
-        self.playoutGapTimer = nil
+        self.playoutGapWorkItem = nil
         if self.playoutPlaying {
           self.playoutAdvance()
         } else {
           self.playoutPendingAdvance = true
         }
       }
+      playoutGapWorkItem = workItem
+      DispatchQueue.main.asyncAfter(deadline: .now() + item.gapSec, execute: workItem)
     } else if playoutPlaying {
       playoutAdvance()
     } else {
@@ -1588,8 +1621,8 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
   }
 
   private func abortPlayout() {
-    playoutGapTimer?.invalidate()
-    playoutGapTimer = nil
+    playoutGapWorkItem?.cancel()
+    playoutGapWorkItem = nil
     if let observer = playoutItemEndObserver {
       NotificationCenter.default.removeObserver(observer)
       playoutItemEndObserver = nil
