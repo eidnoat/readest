@@ -164,47 +164,9 @@ describe('getBackgroundTextureSettings', () => {
 });
 
 describe('saveViewSettings', () => {
-  test('global write swaps the settings reference so replicaSettingsSync subscribers fire', async () => {
-    // Mirrors the gating subscriber installed by replicaSettingsSync.initSettingsSync.
-    // The publish path is bypassed entirely when this never fires, which is exactly
-    // why the MiscPanel "Apply" button was failing to ship custom CSS to the server
-    // until some unrelated setSettings call (e.g. dictionary provider toggle)
-    // happened to create a new top-level reference and trigger a diff sweep.
-    const referenceChanges: SystemSettings[] = [];
-    const unsubscribe = useSettingsStore.subscribe((state, prev) => {
-      if (state.settings && state.settings !== prev?.settings) {
-        referenceChanges.push(state.settings);
-      }
-    });
-
-    try {
-      await saveViewSettings(envConfig, 'book-1', 'userStylesheet', 'body { color: red; }');
-    } finally {
-      unsubscribe();
-    }
-
-    expect(referenceChanges).toHaveLength(1);
-    expect(referenceChanges[0]!.globalViewSettings.userStylesheet).toBe('body { color: red; }');
-  });
-
-  test('global write persists with the same new reference passed to setSettings', async () => {
-    let savedSettings: SystemSettings | null = null;
-    const saveSettingsMock = vi.fn(async (_env: EnvConfigType, s: SystemSettings) => {
-      savedSettings = s;
-    });
-    useSettingsStore.setState({
-      saveSettings: saveSettingsMock,
-    } as unknown as ReturnType<typeof useSettingsStore.getState>);
-
-    await saveViewSettings(envConfig, 'book-1', 'userUIStylesheet', '.app { background: black; }');
-
-    expect(saveSettingsMock).toHaveBeenCalledTimes(1);
-    expect(savedSettings!.globalViewSettings.userUIStylesheet).toBe('.app { background: black; }');
-    expect(savedSettings).toBe(useSettingsStore.getState().settings);
-  });
-
-  test('per-book write (isGlobal=false) does not touch the global settings reference', async () => {
-    getViewSettingsMock.mockImplementation(() => ({ isGlobal: false }));
+  test('book setting write does not touch global settings and applies only to book', async () => {
+    const bookSettings: Record<string, unknown> = { defaultFontSize: 16 };
+    getViewSettingsMock.mockImplementation(() => bookSettings);
     const initial = useSettingsStore.getState().settings;
     const referenceChanges: SystemSettings[] = [];
     const unsubscribe = useSettingsStore.subscribe((state, prev) => {
@@ -214,15 +176,39 @@ describe('saveViewSettings', () => {
     });
 
     try {
-      await saveViewSettings(envConfig, 'book-1', 'userStylesheet', 'body { color: blue; }');
+      await saveViewSettings(envConfig, 'book-1', 'defaultFontSize', 18);
     } finally {
       unsubscribe();
     }
 
-    // Per-book writes go through applyViewSettings on the readerStore — they
-    // must NOT publish global settings, otherwise per-book overrides would leak
-    // into the cross-device globals.
     expect(referenceChanges).toHaveLength(0);
+    expect(useSettingsStore.getState().settings).toBe(initial);
+    expect(bookSettings['defaultFontSize']).toBe(18);
+    expect(bookSettings['isGlobal']).toBe(false);
+    expect(setViewSettingsMock).toHaveBeenCalledWith('book-1', bookSettings);
+  });
+
+  test('uiLanguage write updates global settings', async () => {
+    let savedSettings: SystemSettings | null = null;
+    const saveSettingsMock = vi.fn(async (_env: EnvConfigType, s: SystemSettings) => {
+      savedSettings = s;
+    });
+    useSettingsStore.setState({
+      saveSettings: saveSettingsMock,
+    } as unknown as ReturnType<typeof useSettingsStore.getState>);
+
+    await saveViewSettings(envConfig, '', 'uiLanguage', 'zh-CN');
+
+    expect(saveSettingsMock).toHaveBeenCalledTimes(1);
+    expect(savedSettings!.globalViewSettings.uiLanguage).toBe('zh-CN');
+    expect(savedSettings).toBe(useSettingsStore.getState().settings);
+  });
+
+  test('no-op when bookKey is empty for book settings', async () => {
+    const initial = useSettingsStore.getState().settings;
+    await saveViewSettings(envConfig, '', 'defaultFontSize', 20);
+
+    expect(setViewSettingsMock).not.toHaveBeenCalled();
     expect(useSettingsStore.getState().settings).toBe(initial);
   });
 });

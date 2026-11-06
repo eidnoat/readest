@@ -77,7 +77,7 @@ afterEach(() => {
 });
 
 const setup = (scrollTop = 0) => {
-  render(<SettingsDialog bookKey='' />);
+  render(<SettingsDialog bookKey='book-1' />);
   const viewport = screen.getByTestId('viewport');
   Object.defineProperties(viewport, {
     scrollHeight: { value: 1000 },
@@ -154,14 +154,14 @@ describe('Settings tab scrolling', () => {
 
   it('restores the scroll position when reopened during the same app run', () => {
     scrollAndClose(240);
-    render(<SettingsDialog bookKey='' />);
+    render(<SettingsDialog bookKey='book-1' />);
     expect(screen.getByTestId('viewport').scrollTop).toBe(240);
   });
 
   it('hides the panel until the deferred scroller can take the saved position', async () => {
     scrollAndClose(240);
     scroller.initialized = false;
-    render(<SettingsDialog bookKey='' />);
+    render(<SettingsDialog bookKey='book-1' />);
     const viewport = screen.getByTestId('viewport');
     const panel = screen.getByTestId('content').parentElement!;
     expect(panel.style.visibility).toBe('hidden');
@@ -174,11 +174,11 @@ describe('Settings tab scrolling', () => {
   it('keeps the saved position when closed before the scroller initializes', () => {
     scrollAndClose(240);
     scroller.initialized = false;
-    render(<SettingsDialog bookKey='' />);
+    render(<SettingsDialog bookKey='book-1' />);
     cleanup();
 
     scroller.initialized = true;
-    render(<SettingsDialog bookKey='' />);
+    render(<SettingsDialog bookKey='book-1' />);
     expect(screen.getByTestId('viewport').scrollTop).toBe(240);
   });
 
@@ -187,7 +187,7 @@ describe('Settings tab scrolling', () => {
     scroller.initialized = false;
     render(
       <StrictMode>
-        <SettingsDialog bookKey='' />
+        <SettingsDialog bookKey='book-1' />
       </StrictMode>,
     );
     const viewport = screen.getByTestId('viewport');
@@ -198,7 +198,7 @@ describe('Settings tab scrolling', () => {
   it('does not restore a position saved on another panel', () => {
     scrollAndClose(240);
     localStorage.setItem('lastConfigPanel', 'Layout');
-    render(<SettingsDialog bookKey='' />);
+    render(<SettingsDialog bookKey='book-1' />);
     expect(screen.getByTestId('viewport').scrollTop).toBe(0);
   });
 
@@ -210,5 +210,26 @@ describe('Settings tab scrolling', () => {
     viewport.scrollTop = 300;
     fireEvent.click(screen.getByTitle('Font'));
     expect(viewport.scrollTop).toBe(0);
+  });
+
+  it('excludes book-only tabs (Font, Layout, Theme, Behavior, TTS) when bookKey is empty', () => {
+    render(<SettingsDialog bookKey='' />);
+    expect(screen.queryByTitle('Font')).toBeNull();
+    expect(screen.queryByTitle('Layout')).toBeNull();
+    expect(screen.queryByTitle('Theme')).toBeNull();
+    expect(screen.queryByTitle('Behavior')).toBeNull();
+    expect(screen.queryByTitle('TTS')).toBeNull();
+    expect(screen.queryByTitle('Language')).not.toBeNull();
+    expect(screen.queryByTitle('Integrations')).not.toBeNull();
+  });
+
+  it('includes all tabs when bookKey is provided', () => {
+    render(<SettingsDialog bookKey='book-1' />);
+    expect(screen.queryByTitle('Font')).not.toBeNull();
+    expect(screen.queryByTitle('Layout')).not.toBeNull();
+    expect(screen.queryByTitle('Theme')).not.toBeNull();
+    expect(screen.queryByTitle('Behavior')).not.toBeNull();
+    expect(screen.queryByTitle('TTS')).not.toBeNull();
+    expect(screen.queryByTitle('Language')).not.toBeNull();
   });
 });

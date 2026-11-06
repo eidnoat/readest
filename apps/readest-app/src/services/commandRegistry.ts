@@ -764,12 +764,15 @@ export interface CommandRegistryOptions {
   showAbout: () => void;
   toggleTelemetry: () => void;
   isDesktop: boolean;
+  isBookOpen?: boolean;
   // TODO: add reader-specific actions when reader is open (tts, bookmark, etc.)
 }
 
 export const buildCommandRegistry = (options: CommandRegistryOptions): CommandItem[] => {
   const { _, openSettingsPanel, isDesktop } = options;
   const items: CommandItem[] = [];
+
+  const bookOnlyPanels = new Set<SettingsPanelType>(['Font', 'Layout', 'Theme', 'Control', 'TTS']);
 
   // helper to create settings item
   const createSettingsItem = (
@@ -787,6 +790,10 @@ export const buildCommandRegistry = (options: CommandRegistryOptions): CommandIt
     section: def.section,
     icon: panelIcons[panel],
     action: () => openSettingsPanel(panel, def.id),
+    isAvailable:
+      bookOnlyPanels.has(panel) && options.isBookOpen !== undefined
+        ? () => !!options.isBookOpen
+        : undefined,
   });
 
   // add font panel items

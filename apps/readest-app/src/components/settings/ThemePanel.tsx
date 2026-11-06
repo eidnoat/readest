@@ -35,7 +35,7 @@ import { PREDEFINED_TEXTURES } from '@/styles/textures';
 import { useAtmosphereStore } from '@/store/atmosphereStore';
 import { DefaultHighlightColor, HighlightColor, UserHighlightColor } from '@/types/book';
 import clsx from 'clsx';
-import { ScopeSwitch, SectionTitle, SettingLabel } from './primitives';
+import { SectionTitle, SettingLabel } from './primitives';
 import { HIGHLIGHT_COLOR_HEX } from '@/services/constants';
 import ThemeEditor from './theme/ThemeEditor';
 import ThemeModeSelector from './theme/ThemeModeSelector';
@@ -77,7 +77,7 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
   // Theme Mode and Theme Color share one scope switch (issue #5945): picking
   // a value here is what decouples the library from the reader, so the two
   // halves of "the theme" must never be editable for different pages at once.
-  const [themeScope, setThemeScope] = useState<ThemeScope>(isLibraryContext ? 'library' : 'reader');
+  const themeScope: ThemeScope = isLibraryContext ? 'library' : 'reader';
   const { themeMode, themeColor } = getScopedTheme(themeScope);
   // Swatches preview the scope being EDITED, which is not always the scope
   // on screen — picking a library color from inside a dark reader has to
@@ -277,9 +277,8 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
   // would leave stale or missing spans elsewhere. Each view keeps its own
   // (possibly per-book) settings, hence the per-key lookup.
   const refreshDialogueMarks = () => {
-    const { bookKeys, getView, getViewSettings } = useReaderStore.getState();
-    const isGlobal = getViewSettings(bookKey)?.isGlobal ?? true;
-    const keys = isGlobal ? bookKeys : bookKey ? [bookKey] : [];
+    const { getView, getViewSettings } = useReaderStore.getState();
+    const keys = bookKey ? [bookKey] : [];
     const { getConfig } = useBookDataStore.getState();
     const { getSearchNavState } = useSidebarStore.getState();
     keys.forEach((key) => {
@@ -595,7 +594,6 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
           <div className='space-y-6'>
             <div className='mb-2 flex items-center justify-between gap-2'>
               <SectionTitle>{_('Theme')}</SectionTitle>
-              <ScopeSwitch label={_('Theme')} scope={themeScope} onScopeChange={setThemeScope} />
             </div>
             <ThemeModeSelector
               themeMode={themeMode}

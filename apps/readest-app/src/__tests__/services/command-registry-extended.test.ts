@@ -163,6 +163,23 @@ describe('buildCommandRegistry', () => {
     expect(fullscreen.isAvailable!()).toBe(true);
   });
 
+  it('should restrict book-only settings when isBookOpen is false', () => {
+    const items = buildCommandRegistry(createMockOptions({ isBookOpen: false }));
+    const fontItem = items.find((i) => i.panel === 'Font')!;
+    expect(fontItem.isAvailable).toBeDefined();
+    expect(fontItem.isAvailable!()).toBe(false);
+
+    const langItem = items.find((i) => i.panel === 'Language')!;
+    expect(langItem.isAvailable).toBeUndefined();
+  });
+
+  it('should allow book-only settings when isBookOpen is true', () => {
+    const items = buildCommandRegistry(createMockOptions({ isBookOpen: true }));
+    const fontItem = items.find((i) => i.panel === 'Font')!;
+    expect(fontItem.isAvailable).toBeDefined();
+    expect(fontItem.isAvailable!()).toBe(true);
+  });
+
   it('should not set isAvailable for non-desktop-only actions', () => {
     const items = buildCommandRegistry(createMockOptions());
     const themeItem = items.find((i) => i.id === 'action.toggleTheme')!;

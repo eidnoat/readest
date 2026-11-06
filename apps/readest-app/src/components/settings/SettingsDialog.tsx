@@ -89,7 +89,7 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     setSettingsDialogOpen(false);
   };
 
-  const tabConfig = [
+  const allTabs = [
     {
       tab: 'Font',
       icon: RiFontSize,
@@ -138,19 +138,26 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     },
   ] as TabConfig[];
 
+  const bookOnlyTabs = new Set<SettingsPanelType>(['Font', 'Layout', 'Theme', 'Control', 'TTS']);
+
+  const tabConfig = bookKey ? allTabs : allTabs.filter((tab) => !bookOnlyTabs.has(tab.tab));
+
   const [activePanel, setActivePanel] = useState<SettingsPanelType>(() => {
     // Deep-link: if a caller asked for a specific panel before opening the
     // dialog, honor that for the initial state. The store-clear lives in
     // a useEffect below so we never call a zustand setter during render
     // (would warn "Cannot update a component while rendering another").
-    if (requestedPanel && tabConfig.some((tab) => tab.tab === requestedPanel)) {
+    if (requestedPanel && tabConfig.some((tab) => tab.tab === requestedPanel && !tab.disabled)) {
       return requestedPanel as SettingsPanelType;
     }
     const lastPanel = localStorage.getItem('lastConfigPanel');
-    if (lastPanel && tabConfig.some((tab) => tab.tab === lastPanel)) {
+    if (lastPanel && tabConfig.some((tab) => tab.tab === lastPanel && !tab.disabled)) {
       return lastPanel as SettingsPanelType;
     }
-    return 'Font' as SettingsPanelType;
+    const firstEnabledTab = tabConfig.find((tab) => !tab.disabled);
+    return (
+      firstEnabledTab ? firstEnabledTab.tab : bookKey ? 'Font' : 'Language'
+    ) as SettingsPanelType;
   });
 
   useLayoutEffect(() => {
@@ -344,7 +351,11 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       };
       const panelKey = parts[1]?.toLowerCase();
       const targetPanel = panelMap[panelKey || ''];
-      if (targetPanel && targetPanel !== activePanel) {
+      if (
+        targetPanel &&
+        targetPanel !== activePanel &&
+        tabConfig.some((t) => t.tab === targetPanel && !t.disabled)
+      ) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- panel switch based on external navigation is intended
         setActivePanel(targetPanel);
       }

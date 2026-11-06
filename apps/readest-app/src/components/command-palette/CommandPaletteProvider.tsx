@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useReaderStore } from '@/store/readerStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useEnv } from '@/context/EnvContext';
 import { isTauriAppPlatform } from '@/services/environment';
@@ -61,6 +62,7 @@ export const CommandPaletteProvider: React.FC<CommandPaletteProviderProps> = ({ 
   const [query, setQuery] = useState('');
 
   const isDesktop = isTauriAppPlatform() && !appService?.isMobile;
+  const isBookOpen = useReaderStore((s) => s.bookKeys.length > 0);
 
   // action handlers
   const toggleTheme = useCallback(() => {
@@ -124,6 +126,7 @@ export const CommandPaletteProvider: React.FC<CommandPaletteProviderProps> = ({ 
         showAbout,
         toggleTelemetry,
         isDesktop,
+        isBookOpen,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -138,6 +141,7 @@ export const CommandPaletteProvider: React.FC<CommandPaletteProviderProps> = ({ 
       showAbout,
       toggleTelemetry,
       isDesktop,
+      isBookOpen,
     ],
   );
 

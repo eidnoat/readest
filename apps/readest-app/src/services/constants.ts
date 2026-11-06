@@ -614,7 +614,7 @@ export const DEFAULT_BOOK_SEARCH_CONFIG: BookSearchConfig = {
 };
 
 export const DEFAULT_VIEW_SETTINGS_CONFIG: ViewSettingsConfig = {
-  isGlobal: true,
+  isGlobal: false,
 };
 
 export const SYSTEM_SETTINGS_VERSION = 1;

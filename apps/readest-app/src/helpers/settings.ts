@@ -58,51 +58,40 @@ export const saveViewSettings = async <K extends keyof ViewSettings>(
   bookKey: string,
   key: K,
   value: ViewSettings[K],
-  skipGlobal = false,
+  _skipGlobal = false,
   applyStyles = true,
 ) => {
   const { settings, setSettings, saveSettings } = useSettingsStore.getState();
-  const { bookKeys, getView, getViewState, getViewSettings, setViewSettings } =
-    useReaderStore.getState();
+  const { getView, getViewState, getViewSettings, setViewSettings } = useReaderStore.getState();
   const { getConfig, saveConfig } = useBookDataStore.getState();
 
-  const applyViewSettings = async (bookKey: string) => {
-    const viewSettings = getViewSettings(bookKey);
-    const viewState = getViewState(bookKey);
-    if (bookKey && viewSettings && viewSettings[key] !== value) {
-      viewSettings[key] = value;
-      setViewSettings(bookKey, viewSettings);
-      if (applyStyles) {
-        const view = getView(bookKey);
-        view?.renderer.setStyles?.(getStyles(viewSettings));
-      }
-      const config = getConfig(bookKey);
-      if (viewState?.isPrimary && config) {
-        await saveConfig(envConfig, bookKey, config, settings);
-      }
-    }
-  };
-
-  const isSettingsGlobal = getViewSettings(bookKey)?.isGlobal ?? true;
-  if (isSettingsGlobal && !skipGlobal) {
-    // Build a NEW settings object (and a NEW globalViewSettings) so the
-    // settingsStore subscriber that gates replica push fires — it compares
-    // `state.settings !== prev.settings`, so an in-place mutation followed
-    // by setSettings(same_ref) silently bypasses the publish path and
-    // whitelisted writes (userStylesheet, userUIStylesheet) only ship
-    // on the next unrelated setSettings call.
+  // uiLanguage is a global system setting that lives under globalViewSettings
+  if (key === 'uiLanguage') {
     const nextSettings: SystemSettings = {
       ...settings,
       globalViewSettings: { ...settings.globalViewSettings, [key]: value },
     };
     setSettings(nextSettings);
-
-    for (const bookKey of bookKeys) {
-      await applyViewSettings(bookKey);
-    }
     await saveSettings(envConfig, nextSettings);
-  } else if (bookKey) {
-    await applyViewSettings(bookKey);
+    if (!bookKey) return;
+  }
+
+  if (!bookKey) return;
+
+  const viewSettings = getViewSettings(bookKey);
+  const viewState = getViewState(bookKey);
+  if (viewSettings && viewSettings[key] !== value) {
+    viewSettings[key] = value;
+    viewSettings.isGlobal = false;
+    setViewSettings(bookKey, viewSettings);
+    if (applyStyles) {
+      const view = getView(bookKey);
+      view?.renderer.setStyles?.(getStyles(viewSettings));
+    }
+    const config = getConfig(bookKey);
+    if (viewState?.isPrimary && config) {
+      await saveConfig(envConfig, bookKey, config, settings);
+    }
   }
 };
 
