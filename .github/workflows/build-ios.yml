@@ -13,7 +13,7 @@ on:
 jobs:
   build-ios:
     name: Build iOS and iPadOS IPA
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
 
     steps:
@@ -23,9 +23,12 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Select Xcode 16
+      - name: Select Xcode
         run: |
           XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)
+          fi
           if [ -n "$XCODE_APP" ]; then
             echo "Selecting $XCODE_APP"
             sudo xcode-select -s "$XCODE_APP"
