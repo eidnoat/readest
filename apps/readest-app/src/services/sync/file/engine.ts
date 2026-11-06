@@ -1401,8 +1401,8 @@ export class FileSyncEngine {
       });
       const { uploadedHashes: nextUploadedHashes, emptyDirs: nextEmptyDirs } = buildRecords();
 
-      let finalBookshelves: BookshelfState | undefined = undefined;
-      let finalCatalogs: OPDSCatalog[] | undefined = undefined;
+      let finalBookshelves: BookshelfState | undefined;
+      let finalCatalogs: OPDSCatalog[] | undefined;
       if (canPush) {
         if (this.store.loadBookshelves) {
           const curBs = await this.store.loadBookshelves();
