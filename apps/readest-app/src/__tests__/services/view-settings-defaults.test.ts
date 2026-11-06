@@ -48,6 +48,25 @@ describe('view settings defaults', () => {
     expect((await loadBookConfig(fs, book, settings)).viewSettings?.spreadMode).toBe('none');
   });
 
+  it('applies tablet view settings defaults on tablet devices', () => {
+    const settings = getDefaultViewSettings({
+      fs: {} as FileSystem,
+      isDesktopApp: false,
+      isMobile: true,
+      isTablet: true,
+      isEink: false,
+      isAppDataSandbox: false,
+    });
+    expect(settings.defaultFontSize).toBe(22);
+    expect(settings.marginTopPx).toBe(44);
+    expect(settings.marginBottomPx).toBe(44);
+    expect(settings.marginLeftPx).toBe(32);
+    expect(settings.marginRightPx).toBe(32);
+    expect(settings.compactMarginLeftPx).toBe(32);
+    expect(settings.compactMarginRightPx).toBe(32);
+    expect(settings.gapPercent).toBe(5);
+  });
+
   it('defaults scrolledDirection to vertical (readest#4995)', () => {
     expect(DEFAULT_BOOK_LAYOUT.scrolledDirection).toBe('vertical');
   });

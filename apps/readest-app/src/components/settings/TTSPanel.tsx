@@ -51,7 +51,7 @@ const TTSPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }
   const showInlineReadings = ['ja', 'ko'].includes(getLocale().toLowerCase().split('-')[0]!);
 
   const [ttsMediaMetadata, setTtsMediaMetadata] = useState<TTSMediaMetadataMode>(
-    viewSettings.ttsMediaMetadata ?? 'sentence',
+    viewSettings.ttsMediaMetadata ?? 'paragraph',
   );
   const [ttsPlayerStyle, setTtsPlayerStyle] = useState<TTSPlayerStyle>(
     viewSettings.ttsPlayerStyle ?? 'full',
@@ -325,6 +325,10 @@ const TTSPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }
               { value: '200', label: '200 MB' },
               { value: '500', label: '500 MB' },
               { value: '1024', label: '1 GB' },
+              { value: '2048', label: '2 GB' },
+              { value: '3072', label: '3 GB' },
+              { value: '4096', label: '4 GB' },
+              { value: '5120', label: '5 GB' },
             ]}
           />
         </SettingsRow>

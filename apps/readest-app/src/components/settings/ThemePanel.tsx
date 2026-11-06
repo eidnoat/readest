@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   applyCustomTheme,
   CustomTheme,
@@ -55,7 +55,8 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
     ambientIsDarkMode,
     getScopedTheme,
     setScopedThemeMode,
-    setScopedThemeColor,
+    setScopedLightThemeColor,
+    setScopedDarkThemeColor,
     resetThemeScopes,
     saveCustomTheme,
   } = useThemeStore();
@@ -78,11 +79,22 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
   // a value here is what decouples the library from the reader, so the two
   // halves of "the theme" must never be editable for different pages at once.
   const themeScope: ThemeScope = isLibraryContext ? 'library' : 'reader';
-  const { themeMode, themeColor } = getScopedTheme(themeScope);
+  const {
+    themeMode,
+    lightThemeColor: scopedLightThemeColor,
+    darkThemeColor: scopedDarkThemeColor,
+  } = getScopedTheme(themeScope);
   // Swatches preview the scope being EDITED, which is not always the scope
   // on screen — picking a library color from inside a dark reader has to
   // show the library's light swatches.
   const scopedIsDarkMode = resolveThemeIsDarkMode(themeMode, systemIsDarkMode, ambientIsDarkMode);
+  const [colorModeTab, setColorModeTab] = useState<'light' | 'dark'>(
+    scopedIsDarkMode ? 'dark' : 'light',
+  );
+
+  useEffect(() => {
+    setColorModeTab(scopedIsDarkMode ? 'dark' : 'light');
+  }, [scopedIsDarkMode]);
 
   const currentBackground = getBackgroundTextureSettings(
     textureScope,
@@ -101,6 +113,11 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
   );
   const [editTheme, setEditTheme] = useState<CustomTheme | null>(null);
   const [customThemes, setCustomThemes] = useState<Theme[]>([]);
+  const allThemes = useMemo(() => themes.concat(customThemes), [customThemes]);
+  const getThemeLabel = (colorName: string) => {
+    const item = allThemes.find((t) => t.name === colorName);
+    return item ? _(item.label) : colorName;
+  };
   const [showCustomThemeEditor, setShowCustomThemeEditor] = useState(false);
   const [overrideColor, setOverrideColor] = useState(viewSettings.overrideColor);
   const [codeHighlighting, setcodeHighlighting] = useState(viewSettings.codeHighlighting);
@@ -498,14 +515,23 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
     applyCustomTheme(customTheme);
     saveCustomTheme(envConfig, settings, customTheme);
     setSettings({ ...settings });
-    setScopedThemeColor(themeScope, customTheme.name);
+    if (colorModeTab === 'dark') {
+      setScopedDarkThemeColor(themeScope, customTheme.name);
+    } else {
+      setScopedLightThemeColor(themeScope, customTheme.name);
+    }
     setShowCustomThemeEditor(false);
   };
 
   const handleDeleteCustomTheme = (customTheme: CustomTheme) => {
     saveCustomTheme(envConfig, settings, customTheme, true);
     setSettings({ ...settings });
-    setScopedThemeColor(themeScope, 'default');
+    if (scopedLightThemeColor === customTheme.name) {
+      setScopedLightThemeColor(themeScope, 'gray');
+    }
+    if (scopedDarkThemeColor === customTheme.name) {
+      setScopedDarkThemeColor(themeScope, 'default');
+    }
     setShowCustomThemeEditor(false);
   };
 
@@ -601,14 +627,50 @@ const ThemePanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset
               hasAmbientLightSensor={!!appService?.hasAmbientLightSensor}
               data-setting-id='settings.color.themeMode'
             />
+            <div className='flex items-center justify-between mb-2'>
+              <SectionTitle>{_('Theme Color')}</SectionTitle>
+              <div className='join rounded-lg bg-base-200 p-0.5'>
+                <button
+                  type='button'
+                  onClick={() => setColorModeTab('light')}
+                  className={clsx(
+                    'btn btn-xs join-item px-3 border-none',
+                    colorModeTab === 'light'
+                      ? 'btn-active font-semibold shadow-xs'
+                      : 'bg-transparent text-base-content/70',
+                  )}
+                >
+                  {_('Day')} ({getThemeLabel(scopedLightThemeColor)})
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setColorModeTab('dark')}
+                  className={clsx(
+                    'btn btn-xs join-item px-3 border-none',
+                    colorModeTab === 'dark'
+                      ? 'btn-active font-semibold shadow-xs'
+                      : 'bg-transparent text-base-content/70',
+                  )}
+                >
+                  {_('Night')} ({getThemeLabel(scopedDarkThemeColor)})
+                </button>
+              </div>
+            </div>
             <ThemeColorSelector
-              themes={themes.concat(customThemes)}
-              themeColor={themeColor}
-              isDarkMode={scopedIsDarkMode}
-              onThemeColorChange={(color) => setScopedThemeColor(themeScope, color)}
+              themes={allThemes}
+              themeColor={colorModeTab === 'dark' ? scopedDarkThemeColor : scopedLightThemeColor}
+              isDarkMode={colorModeTab === 'dark'}
+              onThemeColorChange={(color) => {
+                if (colorModeTab === 'dark') {
+                  setScopedDarkThemeColor(themeScope, color);
+                } else {
+                  setScopedLightThemeColor(themeScope, color);
+                }
+              }}
               onEditTheme={handleEditTheme}
               onCreateTheme={() => setShowCustomThemeEditor(true)}
               data-setting-id='settings.color.themeColor'
+              hideTitle
             />
           </div>
 

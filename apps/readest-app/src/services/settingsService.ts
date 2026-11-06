@@ -14,6 +14,7 @@ import {
   SYSTEM_SETTINGS_VERSION,
   DEFAULT_TTS_CONFIG,
   DEFAULT_MOBILE_VIEW_SETTINGS,
+  DEFAULT_TABLET_VIEW_SETTINGS,
   DEFAULT_SYSTEM_SETTINGS,
   DEFAULT_CJK_VIEW_SETTINGS,
   DEFAULT_MOBILE_READSETTINGS,
@@ -33,6 +34,7 @@ import { safeLoadJSON, safeSaveJSON } from './persistence';
 export interface Context {
   fs: FileSystem;
   isMobile: boolean;
+  isTablet?: boolean;
   isDesktopApp?: boolean;
   isEink: boolean;
   isAppDataSandbox: boolean;
@@ -52,6 +54,7 @@ export function getDefaultViewSettings(ctx: Context): ViewSettings {
     ...DEFAULT_VIEW_SETTINGS_CONFIG,
     spreadMode: ctx.isDesktopApp ? 'auto' : 'none',
     ...(ctx.isMobile ? DEFAULT_MOBILE_VIEW_SETTINGS : {}),
+    ...(ctx.isTablet ? DEFAULT_TABLET_VIEW_SETTINGS : {}),
     ...(ctx.isEink ? DEFAULT_EINK_VIEW_SETTINGS : {}),
     ...(isCJKEnv() ? DEFAULT_CJK_VIEW_SETTINGS : {}),
     ...{ ...DEFAULT_TRANSLATOR_CONFIG, translateTargetLang: getTargetLang() },

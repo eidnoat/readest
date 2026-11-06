@@ -37,6 +37,8 @@ interface ThemeState {
    */
   themeMode: ThemeMode;
   themeColor: string;
+  lightThemeColor: string;
+  darkThemeColor: string;
   /** Which page's theme is applied. Every non-reader route is 'library'. */
   themeScope: ThemeScope;
   /**
@@ -46,6 +48,8 @@ interface ThemeState {
    */
   readerThemeMode: ThemeMode;
   readerThemeColor: string;
+  readerLightThemeColor: string;
+  readerDarkThemeColor: string;
   /**
    * Library overrides; null means "inherit the reader pair", exactly like the
    * undefined `libraryBackgroundTextureId` fields (#4743). Absent until the
@@ -54,6 +58,8 @@ interface ThemeState {
    */
   libraryThemeMode: ThemeMode | null;
   libraryThemeColor: string | null;
+  libraryLightThemeColor: string | null;
+  libraryDarkThemeColor: string | null;
   systemIsDarkMode: boolean;
   ambientIsDarkMode: boolean;
   themeCode: ThemeCode;
@@ -83,10 +89,19 @@ interface ThemeState {
   getIsDarkMode: () => boolean;
   setThemeMode: (mode: ThemeMode) => void;
   setThemeColor: (color: string) => void;
+  setLightThemeColor: (color: string) => void;
+  setDarkThemeColor: (color: string) => void;
   setThemeScope: (scope: ThemeScope) => void;
   setScopedThemeMode: (scope: ThemeScope, mode: ThemeMode) => void;
   setScopedThemeColor: (scope: ThemeScope, color: string) => void;
-  getScopedTheme: (scope: ThemeScope) => { themeMode: ThemeMode; themeColor: string };
+  setScopedLightThemeColor: (scope: ThemeScope, color: string) => void;
+  setScopedDarkThemeColor: (scope: ThemeScope, color: string) => void;
+  getScopedTheme: (scope: ThemeScope) => {
+    themeMode: ThemeMode;
+    themeColor: string;
+    lightThemeColor: string;
+    darkThemeColor: string;
+  };
   resetThemeScopes: () => void;
   updateAppTheme: (color: keyof Palette) => void;
   saveCustomTheme: (
@@ -122,6 +137,10 @@ const recordScreenInsets = (
 
 const LIBRARY_THEME_MODE_KEY = 'libraryThemeMode';
 const LIBRARY_THEME_COLOR_KEY = 'libraryThemeColor';
+const LIGHT_THEME_COLOR_KEY = 'lightThemeColor';
+const DARK_THEME_COLOR_KEY = 'darkThemeColor';
+const LIBRARY_LIGHT_THEME_COLOR_KEY = 'libraryLightThemeColor';
+const LIBRARY_DARK_THEME_COLOR_KEY = 'libraryDarkThemeColor';
 
 const getInitialThemeMode = (): ThemeMode => {
   if (typeof window !== 'undefined' && localStorage) {
@@ -131,10 +150,24 @@ const getInitialThemeMode = (): ThemeMode => {
   return 'auto';
 };
 
-const getInitialThemeColor = (): string => {
+const getInitialLightThemeColor = (): string => {
   if (typeof window !== 'undefined' && localStorage) {
-    const defaultColor = window.__READEST_IS_EINK ? 'contrast' : 'default';
-    return localStorage.getItem('themeColor') || defaultColor;
+    const stored = localStorage.getItem(LIGHT_THEME_COLOR_KEY);
+    if (stored) return stored;
+    const legacy = localStorage.getItem('themeColor');
+    if (legacy && legacy !== 'default') return legacy;
+    if (window.__READEST_IS_EINK) return 'contrast';
+  }
+  return 'gray';
+};
+
+const getInitialDarkThemeColor = (): string => {
+  if (typeof window !== 'undefined' && localStorage) {
+    const stored = localStorage.getItem(DARK_THEME_COLOR_KEY);
+    if (stored) return stored;
+    const legacy = localStorage.getItem('themeColor');
+    if (legacy) return legacy;
+    if (window.__READEST_IS_EINK) return 'contrast';
   }
   return 'default';
 };
@@ -147,9 +180,16 @@ const getInitialLibraryThemeMode = (): ThemeMode | null => {
   return null;
 };
 
-const getInitialLibraryThemeColor = (): string | null => {
+const getInitialLibraryLightThemeColor = (): string | null => {
   if (typeof window !== 'undefined' && localStorage) {
-    return localStorage.getItem(LIBRARY_THEME_COLOR_KEY) || null;
+    return localStorage.getItem(LIBRARY_LIGHT_THEME_COLOR_KEY) || null;
+  }
+  return null;
+};
+
+const getInitialLibraryDarkThemeColor = (): string | null => {
+  if (typeof window !== 'undefined' && localStorage) {
+    return localStorage.getItem(LIBRARY_DARK_THEME_COLOR_KEY) || null;
   }
   return null;
 };
@@ -183,16 +223,31 @@ const resolveScopedTheme = (
   scope: ThemeScope,
   raw: Pick<
     ThemeState,
-    'readerThemeMode' | 'readerThemeColor' | 'libraryThemeMode' | 'libraryThemeColor'
+    | 'readerThemeMode'
+    | 'readerLightThemeColor'
+    | 'readerDarkThemeColor'
+    | 'libraryThemeMode'
+    | 'libraryLightThemeColor'
+    | 'libraryDarkThemeColor'
   >,
-): { themeMode: ThemeMode; themeColor: string } => {
-  if (scope === 'reader') {
-    return { themeMode: raw.readerThemeMode, themeColor: raw.readerThemeColor };
-  }
-  return {
-    themeMode: raw.libraryThemeMode ?? raw.readerThemeMode,
-    themeColor: raw.libraryThemeColor ?? raw.readerThemeColor,
-  };
+  isDark: boolean,
+): {
+  themeMode: ThemeMode;
+  themeColor: string;
+  lightThemeColor: string;
+  darkThemeColor: string;
+} => {
+  const isReader = scope === 'reader';
+  const themeMode = isReader ? raw.readerThemeMode : (raw.libraryThemeMode ?? raw.readerThemeMode);
+  const lightThemeColor = isReader
+    ? raw.readerLightThemeColor
+    : (raw.libraryLightThemeColor ?? raw.readerLightThemeColor);
+  const darkThemeColor = isReader
+    ? raw.readerDarkThemeColor
+    : (raw.libraryDarkThemeColor ?? raw.readerDarkThemeColor);
+  const themeColor = isDark ? darkThemeColor : lightThemeColor;
+
+  return { themeMode, themeColor, lightThemeColor, darkThemeColor };
 };
 
 /**
@@ -265,19 +320,30 @@ const syncAmbientLightSubscription = (mode: ThemeMode) => {
 
 export const useThemeStore = create<ThemeState>((set, get) => {
   const initialThemeMode = getInitialThemeMode();
-  const initialThemeColor = getInitialThemeColor();
+  const initialLightThemeColor = getInitialLightThemeColor();
+  const initialDarkThemeColor = getInitialDarkThemeColor();
   const initialLibraryThemeMode = getInitialLibraryThemeMode();
-  const initialLibraryThemeColor = getInitialLibraryThemeColor();
+  const initialLibraryLightThemeColor = getInitialLibraryLightThemeColor();
+  const initialLibraryDarkThemeColor = getInitialLibraryDarkThemeColor();
   const systemIsDarkMode =
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const ambientIsDarkMode = getInitialAmbientIsDarkMode(systemIsDarkMode);
   const initialScope = getThemeScopeForPath();
-  const initialEffective = resolveScopedTheme(initialScope, {
-    readerThemeMode: initialThemeMode,
-    readerThemeColor: initialThemeColor,
-    libraryThemeMode: initialLibraryThemeMode,
-    libraryThemeColor: initialLibraryThemeColor,
-  });
+  const tempMode =
+    initialScope === 'reader' ? initialThemeMode : (initialLibraryThemeMode ?? initialThemeMode);
+  const tempIsDark = resolveThemeIsDarkMode(tempMode, systemIsDarkMode, ambientIsDarkMode);
+  const initialEffective = resolveScopedTheme(
+    initialScope,
+    {
+      readerThemeMode: initialThemeMode,
+      readerLightThemeColor: initialLightThemeColor,
+      readerDarkThemeColor: initialDarkThemeColor,
+      libraryThemeMode: initialLibraryThemeMode,
+      libraryLightThemeColor: initialLibraryLightThemeColor,
+      libraryDarkThemeColor: initialLibraryDarkThemeColor,
+    },
+    tempIsDark,
+  );
   const isDarkMode = resolveThemeIsDarkMode(
     initialEffective.themeMode,
     systemIsDarkMode,
@@ -298,17 +364,31 @@ export const useThemeStore = create<ThemeState>((set, get) => {
    */
   const applyActiveScope = (patch: Partial<ThemeState>, refreshThemeCode: boolean) => {
     const next = { ...get(), ...patch };
-    const effective = resolveScopedTheme(next.themeScope, next);
+    const activeMode =
+      next.themeScope === 'reader'
+        ? next.readerThemeMode
+        : (next.libraryThemeMode ?? next.readerThemeMode);
+    const activeIsDark = resolveThemeIsDarkMode(
+      activeMode,
+      next.systemIsDarkMode,
+      next.ambientIsDarkMode,
+    );
+    const effective = resolveScopedTheme(next.themeScope, next, activeIsDark);
     const nextIsDarkMode = resolveThemeIsDarkMode(
       effective.themeMode,
       next.systemIsDarkMode,
       next.ambientIsDarkMode,
     );
+    if (typeof window !== 'undefined' && localStorage) {
+      localStorage.setItem('themeColor', effective.themeColor);
+    }
     applyDataTheme(effective.themeColor, nextIsDarkMode);
     set({
       ...patch,
       themeMode: effective.themeMode,
       themeColor: effective.themeColor,
+      lightThemeColor: effective.lightThemeColor,
+      darkThemeColor: effective.darkThemeColor,
       isDarkMode: nextIsDarkMode,
       ...(refreshThemeCode ? { themeCode: getThemeCode() } : {}),
     });
@@ -318,11 +398,17 @@ export const useThemeStore = create<ThemeState>((set, get) => {
   return {
     themeMode: initialEffective.themeMode,
     themeColor: initialEffective.themeColor,
+    lightThemeColor: initialEffective.lightThemeColor,
+    darkThemeColor: initialEffective.darkThemeColor,
     themeScope: initialScope,
     readerThemeMode: initialThemeMode,
-    readerThemeColor: initialThemeColor,
+    readerThemeColor: initialEffective.themeColor,
+    readerLightThemeColor: initialLightThemeColor,
+    readerDarkThemeColor: initialDarkThemeColor,
     libraryThemeMode: initialLibraryThemeMode,
-    libraryThemeColor: initialLibraryThemeColor,
+    libraryThemeColor: initialLibraryThemeMode ? initialEffective.themeColor : null,
+    libraryLightThemeColor: initialLibraryLightThemeColor,
+    libraryDarkThemeColor: initialLibraryDarkThemeColor,
     systemIsDarkMode,
     ambientIsDarkMode,
     isDarkMode,
@@ -342,7 +428,13 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     setStatusBarHeight: (height: number) => set({ statusBarHeight: height }),
     setSystemUIAlwaysHidden: (hidden: boolean) => set({ systemUIAlwaysHidden: hidden }),
     getIsDarkMode: () => get().isDarkMode,
-    getScopedTheme: (scope) => resolveScopedTheme(scope, get()),
+    getScopedTheme: (scope) => {
+      const raw = get();
+      const isReader = scope === 'reader';
+      const mode = isReader ? raw.readerThemeMode : (raw.libraryThemeMode ?? raw.readerThemeMode);
+      const isDark = resolveThemeIsDarkMode(mode, raw.systemIsDarkMode, raw.ambientIsDarkMode);
+      return resolveScopedTheme(scope, raw, isDark);
+    },
     setThemeScope: (scope) => {
       if (get().themeScope === scope) return;
       const mode = applyActiveScope({ themeScope: scope }, false);
@@ -359,11 +451,47 @@ export const useThemeStore = create<ThemeState>((set, get) => {
         themeScope === 'library' && libraryThemeMode !== null ? 'library' : 'reader';
       get().setScopedThemeMode(target, mode);
     },
-    setThemeColor: (color) => {
-      const { themeScope, libraryThemeColor } = get();
+    setLightThemeColor: (color) => {
+      const { themeScope, libraryLightThemeColor } = get();
       const target: ThemeScope =
-        themeScope === 'library' && libraryThemeColor !== null ? 'library' : 'reader';
-      get().setScopedThemeColor(target, color);
+        themeScope === 'library' && libraryLightThemeColor !== null ? 'library' : 'reader';
+      get().setScopedLightThemeColor(target, color);
+    },
+    setDarkThemeColor: (color) => {
+      const { themeScope, libraryDarkThemeColor } = get();
+      const target: ThemeScope =
+        themeScope === 'library' && libraryDarkThemeColor !== null ? 'library' : 'reader';
+      get().setScopedDarkThemeColor(target, color);
+    },
+    setScopedLightThemeColor: (scope, color) => {
+      const isReader = scope === 'reader';
+      if (typeof window !== 'undefined' && localStorage) {
+        localStorage.setItem(
+          isReader ? LIGHT_THEME_COLOR_KEY : LIBRARY_LIGHT_THEME_COLOR_KEY,
+          color,
+        );
+      }
+      applyActiveScope(
+        isReader ? { readerLightThemeColor: color } : { libraryLightThemeColor: color },
+        isReader,
+      );
+    },
+    setScopedDarkThemeColor: (scope, color) => {
+      const isReader = scope === 'reader';
+      if (typeof window !== 'undefined' && localStorage) {
+        localStorage.setItem(isReader ? DARK_THEME_COLOR_KEY : LIBRARY_DARK_THEME_COLOR_KEY, color);
+      }
+      applyActiveScope(
+        isReader ? { readerDarkThemeColor: color } : { libraryDarkThemeColor: color },
+        isReader,
+      );
+    },
+    setThemeColor: (color) => {
+      if (get().isDarkMode) {
+        get().setDarkThemeColor(color);
+      } else {
+        get().setLightThemeColor(color);
+      }
     },
     setScopedThemeMode: (scope, mode) => {
       const isReader = scope === 'reader';
@@ -378,29 +506,37 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     },
     setScopedThemeColor: (scope, color) => {
       const isReader = scope === 'reader';
-      if (typeof window !== 'undefined' && localStorage) {
-        localStorage.setItem(isReader ? 'themeColor' : LIBRARY_THEME_COLOR_KEY, color);
+      const mode = isReader
+        ? get().readerThemeMode
+        : (get().libraryThemeMode ?? get().readerThemeMode);
+      const isDark = resolveThemeIsDarkMode(mode, get().systemIsDarkMode, get().ambientIsDarkMode);
+      if (isDark) {
+        get().setScopedDarkThemeColor(scope, color);
+      } else {
+        get().setScopedLightThemeColor(scope, color);
       }
-      applyActiveScope(
-        isReader ? { readerThemeColor: color } : { libraryThemeColor: color },
-        isReader,
-      );
     },
     // "Reset to defaults" has to drop the library override too, otherwise a
     // decoupled library keeps its old look and the reset looks broken.
     resetThemeScopes: () => {
       if (typeof window !== 'undefined' && localStorage) {
         localStorage.setItem('themeMode', 'auto');
-        localStorage.setItem('themeColor', 'default');
+        localStorage.setItem(LIGHT_THEME_COLOR_KEY, 'gray');
+        localStorage.setItem(DARK_THEME_COLOR_KEY, 'default');
+        localStorage.setItem('themeColor', 'gray');
         localStorage.removeItem(LIBRARY_THEME_MODE_KEY);
+        localStorage.removeItem(LIBRARY_LIGHT_THEME_COLOR_KEY);
+        localStorage.removeItem(LIBRARY_DARK_THEME_COLOR_KEY);
         localStorage.removeItem(LIBRARY_THEME_COLOR_KEY);
       }
       const activeMode = applyActiveScope(
         {
           readerThemeMode: 'auto',
-          readerThemeColor: 'default',
+          readerLightThemeColor: 'gray',
+          readerDarkThemeColor: 'default',
           libraryThemeMode: null,
-          libraryThemeColor: null,
+          libraryLightThemeColor: null,
+          libraryDarkThemeColor: null,
         },
         true,
       );
@@ -474,26 +610,37 @@ export const loadDataTheme = (scope: ThemeScope = getThemeScopeForPath()) => {
   if (typeof localStorage === 'undefined' || typeof document === 'undefined') return;
 
   const themeMode = localStorage.getItem('themeMode');
+  const lightThemeColor = localStorage.getItem(LIGHT_THEME_COLOR_KEY);
+  const darkThemeColor = localStorage.getItem(DARK_THEME_COLOR_KEY);
   const themeColor = localStorage.getItem('themeColor');
   const libraryThemeMode = getInitialLibraryThemeMode();
-  const libraryThemeColor = getInitialLibraryThemeColor();
-  // Nothing configured at all: leave the attribute alone and let useTheme
-  // paint the default. A library-only override still counts as configured —
-  // decoupling the library writes only its own key, so a user who never
-  // touched the reader theme has no reader keys to gate on, and checking
-  // those alone would skip the early paint in exactly that case.
-  if (!(themeMode && themeColor) && !libraryThemeMode && !libraryThemeColor) return;
+  const libraryLightThemeColor = getInitialLibraryLightThemeColor();
+  const libraryDarkThemeColor = getInitialLibraryDarkThemeColor();
+  if (
+    !(themeMode && (lightThemeColor || darkThemeColor || themeColor)) &&
+    !libraryThemeMode &&
+    !libraryLightThemeColor &&
+    !libraryDarkThemeColor
+  )
+    return;
 
   const systemIsDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const ambientIsDarkMode = getInitialAmbientIsDarkMode(systemIsDarkMode);
-  const effective = resolveScopedTheme(scope, {
-    // Via the same helpers the store initializes from, so an absent reader key
-    // resolves to the implicit default rather than a null in the attribute.
-    readerThemeMode: getInitialThemeMode(),
-    readerThemeColor: getInitialThemeColor(),
-    libraryThemeMode,
-    libraryThemeColor,
-  });
+  const tempMode =
+    scope === 'reader' ? getInitialThemeMode() : (libraryThemeMode ?? getInitialThemeMode());
+  const tempIsDark = resolveThemeIsDarkMode(tempMode, systemIsDarkMode, ambientIsDarkMode);
+  const effective = resolveScopedTheme(
+    scope,
+    {
+      readerThemeMode: getInitialThemeMode(),
+      readerLightThemeColor: getInitialLightThemeColor(),
+      readerDarkThemeColor: getInitialDarkThemeColor(),
+      libraryThemeMode,
+      libraryLightThemeColor,
+      libraryDarkThemeColor,
+    },
+    tempIsDark,
+  );
   const isDarkMode = resolveThemeIsDarkMode(
     effective.themeMode,
     systemIsDarkMode,

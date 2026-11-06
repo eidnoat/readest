@@ -44,12 +44,18 @@ describe('themeStore', () => {
     // Reset store to initial state
     useThemeStore.setState({
       themeMode: 'auto',
-      themeColor: 'default',
+      themeColor: 'gray',
+      lightThemeColor: 'gray',
+      darkThemeColor: 'default',
       themeScope: 'library',
       readerThemeMode: 'auto',
-      readerThemeColor: 'default',
+      readerThemeColor: 'gray',
+      readerLightThemeColor: 'gray',
+      readerDarkThemeColor: 'default',
       libraryThemeMode: null,
       libraryThemeColor: null,
+      libraryLightThemeColor: null,
+      libraryDarkThemeColor: null,
       systemIsDarkMode: false,
       ambientIsDarkMode: false,
       isDarkMode: false,
@@ -68,7 +74,9 @@ describe('themeStore', () => {
     test('has correct default values', () => {
       const state = useThemeStore.getState();
       expect(state.themeMode).toBe('auto');
-      expect(state.themeColor).toBe('default');
+      expect(state.themeColor).toBe('gray');
+      expect(state.lightThemeColor).toBe('gray');
+      expect(state.darkThemeColor).toBe('default');
       expect(state.systemUIVisible).toBe(false);
       expect(state.statusBarHeight).toBe(24);
       expect(state.systemUIAlwaysHidden).toBe(false);
@@ -125,7 +133,7 @@ describe('themeStore', () => {
       expect(document.documentElement.getAttribute('data-theme')).toBe('default-dark');
 
       useThemeStore.getState().setThemeMode('light');
-      expect(document.documentElement.getAttribute('data-theme')).toBe('default-light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('gray-light');
     });
   });
 
@@ -213,15 +221,19 @@ describe('themeStore', () => {
     test('updates data-theme attribute when system theme changes', () => {
       useThemeStore.setState({
         themeMode: 'auto',
-        themeColor: 'default',
+        themeColor: 'gray',
+        lightThemeColor: 'gray',
+        darkThemeColor: 'default',
         readerThemeMode: 'auto',
-        readerThemeColor: 'default',
+        readerThemeColor: 'gray',
+        readerLightThemeColor: 'gray',
+        readerDarkThemeColor: 'default',
       });
       useThemeStore.getState().handleSystemThemeChange(true);
       expect(document.documentElement.getAttribute('data-theme')).toBe('default-dark');
 
       useThemeStore.getState().handleSystemThemeChange(false);
-      expect(document.documentElement.getAttribute('data-theme')).toBe('default-light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('gray-light');
     });
   });
 
@@ -232,8 +244,12 @@ describe('themeStore', () => {
         readerThemeMode: 'ambient',
         ambientIsDarkMode: false,
         isDarkMode: false,
-        themeColor: 'default',
-        readerThemeColor: 'default',
+        themeColor: 'gray',
+        lightThemeColor: 'gray',
+        darkThemeColor: 'default',
+        readerThemeColor: 'gray',
+        readerLightThemeColor: 'gray',
+        readerDarkThemeColor: 'default',
       });
       useThemeStore.getState().handleAmbientLightChange(5);
       expect(useThemeStore.getState().ambientIsDarkMode).toBe(true);
@@ -403,7 +419,7 @@ describe('themeStore', () => {
       localStorage.setItem('themeColor', 'default');
       // jsdom matchMedia mock returns matches: false by default (from vitest.setup.ts)
       loadDataTheme();
-      expect(document.documentElement.getAttribute('data-theme')).toBe('default-light');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('gray-light');
     });
 
     test('does nothing when themeMode is not in localStorage', () => {

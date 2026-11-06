@@ -34,6 +34,11 @@ const packState = vi.hoisted(() => {
   };
 });
 
+vi.mock('@/services/sync/cloudSyncProvider', () => ({
+  isReadestCloudEnabled: (settings?: SystemSettings | null) =>
+    settings?.readestCloud?.enabled !== false,
+}));
+
 vi.mock('@/services/tts/providers/opfsPackFs', () => ({
   createOpfsPackFs: vi.fn(async () => packState.fs),
 }));
@@ -734,9 +739,9 @@ describe('BookTTSCacheStore', () => {
 });
 
 describe('getTTSCacheConfig', () => {
-  test('defaults to enabled, 200 MB budget', () => {
+  test('defaults to enabled, 1024 MB budget', () => {
     localStorage.removeItem('readest-tts-cache');
-    expect(getTTSCacheConfig()).toEqual({ enabled: true, budgetMB: 200 });
+    expect(getTTSCacheConfig()).toEqual({ enabled: true, budgetMB: 1024 });
   });
 
   test('reads overrides from localStorage and ignores the old sync switch', () => {

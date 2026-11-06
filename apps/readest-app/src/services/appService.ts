@@ -61,6 +61,13 @@ export abstract class BaseAppService implements AppService {
   isDesktopApp = false;
   isAppImage = false;
   isEink = false;
+  get isTablet(): boolean {
+    if (!this.isMobile) return false;
+    if (typeof screen !== 'undefined') {
+      return Math.min(screen.width, screen.height) >= 600;
+    }
+    return false;
+  }
   hasTrafficLight = false;
   hasWindow = false;
   hasWindowBar = false;
@@ -277,6 +284,7 @@ export abstract class BaseAppService implements AppService {
     return {
       fs: this.fs,
       isMobile: this.isMobile,
+      isTablet: this.isTablet,
       isDesktopApp: this.isDesktopApp,
       isEink: this.isEink,
       isAppDataSandbox: this.isAppDataSandbox,

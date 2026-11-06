@@ -13,6 +13,7 @@ interface ThemeColorSelectorProps {
   onThemeColorChange: (name: string) => void;
   onEditTheme: (name: string) => void;
   onCreateTheme: () => void;
+  hideTitle?: boolean;
 }
 
 const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
@@ -22,6 +23,7 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
   onThemeColorChange,
   onEditTheme,
   onCreateTheme,
+  hideTitle = false,
 }) => {
   const _ = useTranslation();
   const iconSize16 = useResponsiveSize(16);
@@ -29,7 +31,7 @@ const ThemeColorSelector: React.FC<ThemeColorSelectorProps> = ({
 
   return (
     <div>
-      <SectionTitle className='mb-2'>{_('Theme Color')}</SectionTitle>
+      {!hideTitle && <SectionTitle className='mb-2'>{_('Theme Color')}</SectionTitle>}
       <div className='grid grid-cols-3 gap-4'>
         {themes.map(({ name, label, colors, isCustomizable }) => (
           <button

@@ -21,7 +21,7 @@ import { createOpfsPackFs } from './opfsPackFs';
 import { SqliteTTSCacheStore, TTSPackFs } from './sqliteCacheStore';
 
 const CONFIG_KEY = 'readest-tts-cache';
-const DEFAULT_BUDGET_MB = 200;
+const DEFAULT_BUDGET_MB = 1024;
 const COMPACT_DEBOUNCE_MS = 30_000;
 const DOWNLOADS_MARKER = 'downloads.json';
 

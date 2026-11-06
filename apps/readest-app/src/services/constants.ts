@@ -457,6 +457,17 @@ export const DEFAULT_MOBILE_VIEW_SETTINGS: Partial<ViewSettings> = {
   spreadMode: 'none',
 };
 
+export const DEFAULT_TABLET_VIEW_SETTINGS: Partial<ViewSettings> = {
+  defaultFontSize: 22,
+  marginTopPx: 44,
+  marginBottomPx: 44,
+  marginLeftPx: 32,
+  marginRightPx: 32,
+  compactMarginLeftPx: 32,
+  compactMarginRightPx: 32,
+  gapPercent: 5,
+};
+
 export const DEFAULT_CJK_VIEW_SETTINGS: Partial<ViewSettings> = {
   fullJustification: true,
   textIndent: 2,
@@ -537,7 +548,7 @@ export const DEFAULT_TTS_CONFIG: TTSConfig = {
   ttsLocation: '',
   ttsHighlightOptions: { style: 'highlight', color: '#808080' },
   ttsHighlightGranularity: 'word',
-  ttsMediaMetadata: 'sentence',
+  ttsMediaMetadata: 'paragraph',
   ttsPlayerStyle: 'full',
   ttsSkipInlineAnnotations: false,
   ttsPauseAfterSentence: false,

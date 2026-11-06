@@ -116,6 +116,7 @@ export interface AppService {
   isDesktopApp: boolean;
   isAppImage: boolean;
   isEink: boolean;
+  isTablet: boolean;
   canCustomizeRootDir: boolean;
   canReadExternalDir: boolean;
   supportsCoverThumbnailOptimization: boolean;

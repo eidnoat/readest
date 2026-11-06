@@ -1126,11 +1126,15 @@ export interface ThemeCode {
 
 export const getThemeCode = () => {
   let themeMode = 'auto';
+  let lightThemeColor = 'gray';
+  let darkThemeColor = 'default';
   let themeColor = 'default';
   let systemIsDarkMode = false;
   let ambientIsDarkMode = false;
   let customThemes: CustomTheme[] = [];
   if (typeof window !== 'undefined') {
+    lightThemeColor = localStorage.getItem('lightThemeColor') || 'gray';
+    darkThemeColor = localStorage.getItem('darkThemeColor') || 'default';
     themeColor = localStorage.getItem('themeColor') || 'default';
     themeMode = localStorage.getItem('themeMode') || 'auto';
     systemIsDarkMode = localStorage.getItem('systemIsDarkMode') === 'true';
@@ -1144,9 +1148,10 @@ export const getThemeCode = () => {
     themeMode === 'dark' ||
     (themeMode === 'auto' && systemIsDarkMode) ||
     (themeMode === 'ambient' && ambientIsDarkMode);
-  let currentTheme = themes.find((theme) => theme.name === themeColor);
+  const activeColor = isDarkMode ? darkThemeColor : lightThemeColor;
+  let currentTheme = themes.find((theme) => theme.name === activeColor);
   if (!currentTheme) {
-    const customTheme = customThemes.find((theme) => theme.name === themeColor);
+    const customTheme = customThemes.find((theme) => theme.name === activeColor);
     if (customTheme) {
       currentTheme = {
         name: customTheme.name,
@@ -1158,7 +1163,7 @@ export const getThemeCode = () => {
       };
     }
   }
-  if (!currentTheme) currentTheme = themes[0];
+  if (!currentTheme) currentTheme = themes.find((t) => t.name === themeColor) || themes[0];
   const defaultPalette = isDarkMode ? currentTheme!.colors.dark : currentTheme!.colors.light;
   return {
     bg: defaultPalette['base-100'],

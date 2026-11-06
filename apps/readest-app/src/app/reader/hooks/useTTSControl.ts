@@ -356,7 +356,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
             title: bookData.book.title,
             author: bookData.book.author,
             coverImageUrl: bookData.book.coverImageUrl || null,
-            metadataMode: getViewSettings(bookKey)?.ttsMediaMetadata ?? 'sentence',
+            metadataMode: getViewSettings(bookKey)?.ttsMediaMetadata ?? 'paragraph',
             getSectionLabel: () => getProgress(bookKey)?.sectionLabel,
           });
         }
@@ -1024,7 +1024,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           title: bookData.book.title,
           author: bookData.book.author,
           coverImageUrl: bookData.book.coverImageUrl || null,
-          metadataMode: viewSettings.ttsMediaMetadata ?? 'sentence',
+          metadataMode: viewSettings.ttsMediaMetadata ?? 'paragraph',
           getSectionLabel: () => getProgress(bookKey)?.sectionLabel,
         });
         // Reflect a standing "End of Chapter" preference (or an already-armed
