@@ -788,7 +788,7 @@ class NativeTTSPlugin: Plugin, AVSpeechSynthesizerDelegate {
       if #available(iOS 14.5, *),
         let reasonRaw = info[AVAudioSessionInterruptionReasonKey] as? UInt,
         let reason = AVAudioSession.InterruptionReason(rawValue: reasonRaw),
-        reason == .sceneWasBackgrounded || reason == .appWasSuspended
+        reason == .appWasSuspended
       {
         keepAliveLog.log("interruption began IGNORED (reason: \(reasonRaw))")
         return
