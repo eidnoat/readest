@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   recordHidden: vi.fn(),
   recordShown: vi.fn(),
   storeInsets: { top: 0, right: 0, bottom: 0, left: 0 } as Record<string, number> | null,
+  osPlatform: 'ios',
   focus: undefined as ((event: { payload: boolean }) => void) | undefined,
   unlisten: vi.fn(),
 }));
@@ -30,7 +31,7 @@ vi.mock('@/store/themeStore', () => ({
   ),
 }));
 vi.mock('@/utils/bridge', () => ({ getSafeAreaInsets: h.getInsets }));
-vi.mock('@/utils/misc', () => ({ getOSPlatform: () => 'ios' }));
+vi.mock('@/utils/misc', () => ({ getOSPlatform: () => h.osPlatform }));
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
     onFocusChanged: (listener: typeof h.focus) => {
@@ -140,5 +141,25 @@ it('dedupes against the store, so another instance writing it cannot leave it st
   h.storeInsets = { top: 0, right: 0, bottom: 34, left: 0 };
   await act(async () => h.focus?.({ payload: true }));
   expect(h.updateInsets).toHaveBeenLastCalledWith(duo);
+  unmount();
+});
+
+it('queries native safe area insets on iPadOS (isIOSApp true, getOSPlatform ios)', async () => {
+  h.osPlatform = 'ios';
+  const ipadInsets = { top: 24, right: 0, bottom: 20, left: 0 };
+  h.getInsets.mockResolvedValue(ipadInsets);
+  const { unmount } = renderHook(() => useSafeAreaInsets());
+  await waitFor(() => expect(h.getInsets).toHaveBeenCalled());
+  await waitFor(() => expect(h.updateInsets).toHaveBeenLastCalledWith(ipadInsets));
+  unmount();
+});
+
+it('uses zero insets on macOS Designed for iPad (isIOSApp true, getOSPlatform macos)', async () => {
+  h.osPlatform = 'macos';
+  h.storeInsets = { top: 24, right: 0, bottom: 20, left: 0 };
+  const { unmount } = renderHook(() => useSafeAreaInsets());
+  await waitFor(() =>
+    expect(h.updateInsets).toHaveBeenLastCalledWith({ top: 0, right: 0, bottom: 0, left: 0 }),
+  );
   unmount();
 });

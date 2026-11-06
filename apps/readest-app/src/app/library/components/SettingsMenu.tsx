@@ -1,14 +1,13 @@
 import clsx from 'clsx';
 import React, { useEffect, useState } from 'react';
-import { PiGear, PiChartBar, PiCardsThree } from 'react-icons/pi';
+import { PiGear, PiChartBar } from 'react-icons/pi';
 import { PiSun, PiMoon } from 'react-icons/pi';
 import { TbSunMoon } from 'react-icons/tb';
-import { MdCloudSync, MdSync, MdSyncProblem, MdOutlineSensors } from 'react-icons/md';
+import { MdSync, MdSyncProblem, MdOutlineSensors } from 'react-icons/md';
 
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
 import { DOWNLOAD_READEST_URL } from '@/services/constants';
 import { setReadingStatsDialogVisible } from '@/components/stats/ReadingStatsDialog';
-import { setVocabularyDialogVisible } from '@/components/vocabulary/VocabularyDialog';
 import { setBackupDialogVisible } from '@/app/library/components/BackupWindow';
 import { setCacheManagerDialogVisible } from '@/app/library/components/CacheManagerWindow';
 import { useEnv } from '@/context/EnvContext';
@@ -17,7 +16,6 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useCloudSyncStatus } from '@/hooks/useCloudSyncStatus';
-import { useTransferQueue } from '@/hooks/useTransferQueue';
 import { canToggleFullScreen, tauriHandleSetAlwaysOnTop, toggleFullScreen } from '@/utils/window';
 import { setAboutDialogVisible } from '@/components/AboutWindow';
 import { setMigrateDataDirDialogVisible } from '@/app/library/components/MigrateDataWindow';
@@ -84,12 +82,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
     setIsDropdownOpen?.(false);
   };
   const { isSyncing, setLibrary } = useLibraryStore();
-  const { stats, hasActiveTransfers, setIsTransferQueueOpen } = useTransferQueue();
-
-  const openTransferQueue = () => {
-    setIsTransferQueueOpen(true);
-    setIsDropdownOpen?.(false);
-  };
 
   const showAboutReadest = () => {
     setAboutDialogVisible(true);
@@ -197,11 +189,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
     setReadingStatsDialogVisible(true);
   };
 
-  const openVocabulary = () => {
-    setIsDropdownOpen?.(false);
-    setVocabularyDialogVisible(true);
-  };
-
   const openSettingsDialog = () => {
     setIsDropdownOpen?.(false);
     setSettingsDialogOpen(true);
@@ -281,21 +268,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         }
       />
 
-      <MenuItem
-        label={_('Cloud File Transfers')}
-        Icon={MdCloudSync}
-        description={
-          hasActiveTransfers
-            ? _('{{activeCount}} active, {{pendingCount}} pending', {
-                activeCount: stats.active,
-                pendingCount: stats.pending,
-              })
-            : stats.failed > 0
-              ? _('{{failedCount}} failed', { failedCount: stats.failed })
-              : ''
-        }
-        onClick={openTransferQueue}
-      />
       {isTauriAppPlatform() && (
         <MenuItem
           label={_('Auto Import on File Open')}
@@ -345,7 +317,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         onClick={cycleThemeMode}
       />
       <MenuItem label={_('Reading Statistics')} Icon={PiChartBar} onClick={openReadingStats} />
-      <MenuItem label={_('Vocabulary')} Icon={PiCardsThree} onClick={openVocabulary} />
       <MenuItem label={_('Settings')} Icon={PiGear} onClick={openSettingsDialog} />
       <hr aria-hidden='true' className='border-base-200 my-1' />
       <MenuItem label={_('Advanced Settings')}>

@@ -27,9 +27,6 @@ import type {
   WebSearchEntry,
 } from '@/services/dictionaries/types';
 import type { Insets } from '@/types/misc';
-import type { VocabularyOccurrence, VocabularyState } from '@/services/vocabulary/types';
-import { entryId, normalizeWordKey } from '@/services/vocabulary/entry';
-import { useVocabularyStore } from '@/store/vocabularyStore';
 
 const isTauri = isTauriAppPlatform();
 const ZERO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -60,15 +57,6 @@ export interface UseDictionaryResultsArgs {
   lang?: string;
   /** Where `word` was selected in the book, for the AI context dictionary (#5544). */
   selection?: DictionarySelectionContext;
-  /** Save the lookup to the vocabulary builder (#789); also enables the header chips. */
-  capture?: VocabularyCapture;
-}
-
-export interface VocabularyCapture {
-  /** Vocabulary language of the book (see `vocabularyLang`). */
-  lang: string;
-  /** The sentence to save; without it the lookup isn't recorded, only the chips show. */
-  occurrence?: VocabularyOccurrence;
 }
 
 export interface DictionaryResultsState {
@@ -95,8 +83,6 @@ export interface DictionaryResultsState {
   isSpeaking: boolean;
   /** Pronounce the current word via Edge TTS (falling back to platform speech). */
   speakWord: () => void;
-  /** Vocabulary language for the header chips; unset hides them. */
-  vocabularyLang?: string;
 }
 
 /**
@@ -116,7 +102,6 @@ export function useDictionaryResults({
   word,
   lang,
   selection,
-  capture,
 }: UseDictionaryResultsArgs): DictionaryResultsState {
   const { appService } = useEnv();
   const { dictionaries, settings } = useCustomDictionaryStore();
@@ -162,28 +147,6 @@ export function useDictionaryResults({
   // The passage only describes the selected word, not words reached through
   // in-popup links.
   const currentSelection = historyStack.length === 1 ? stableSelection : undefined;
-
-  // Automatic capture: the word selected in the book, with its sentence.
-  // Words reached through in-entry links have no sentence and aren't saved.
-  const saveLookups = settings.saveLookupsToVocabulary !== false;
-  useEffect(() => {
-    // No sentence means a re-lookup (from the vocabulary window): chips only.
-    if (!capture?.occurrence || !saveLookups) return;
-    useVocabularyStore.getState().recordLookup({
-      word,
-      lang: capture.lang,
-      occurrence: capture.occurrence,
-    });
-    // Keyed on the occurrence's book and sentence rather than the capture
-    // object, so a new sentence for the same word is saved too.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    word,
-    capture?.lang,
-    capture?.occurrence?.bookHash,
-    capture?.occurrence?.sentence,
-    saveLookups,
-  ]);
 
   // Reset the history when the host reopens with a new word from outside
   // (selection change in the reader). A double-click selection can carry
@@ -497,7 +460,6 @@ export function useDictionaryResults({
     closeZoomedImage,
     isSpeaking,
     speakWord,
-    vocabularyLang: capture?.lang,
   };
 }
 
@@ -511,50 +473,7 @@ interface DictionaryResultsHeaderProps {
   onSpeak?: () => void;
   /** Whether pronunciation is in progress, for the active button state. */
   speaking?: boolean;
-  /** Shows the Learning / Mastered chips for `currentWord` in this language. */
-  vocabularyLang?: string;
 }
-
-export const VocabularyChips: React.FC<{ word: string; lang: string }> = ({ word, lang }) => {
-  const _ = useTranslation();
-  const id = entryId(lang, normalizeWordKey(word));
-  const state = useVocabularyStore((s) => {
-    const e = s.entries[id];
-    return e && !e.deletedAt ? e.state : 'none';
-  });
-  const toggle = (target: VocabularyState) => {
-    const store = useVocabularyStore.getState();
-    store.setState(store.ensureEntry(word, lang), state === target ? 'none' : target);
-  };
-  const chips: { state: VocabularyState; label: string }[] = [
-    { state: 'learning', label: _('Learning') },
-    { state: 'mastered', label: _('Mastered') },
-  ];
-  return (
-    <div className='flex justify-center gap-2 pb-1'>
-      {chips.map((chip) => {
-        const active = state === chip.state;
-        return (
-          <button
-            key={chip.state}
-            type='button'
-            aria-pressed={active}
-            onClick={() => toggle(chip.state)}
-            className={clsx(
-              'min-h-8 rounded-full border px-3 text-xs',
-              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-base-content/15',
-              active
-                ? 'btn-contrast'
-                : 'eink-bordered border-base-content/20 text-base-content/70 not-eink:hover:bg-base-200/60',
-            )}
-          >
-            {chip.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
 
 export const DictionaryResultsHeader: React.FC<DictionaryResultsHeaderProps> = ({
   headerClassName,
@@ -564,7 +483,6 @@ export const DictionaryResultsHeader: React.FC<DictionaryResultsHeaderProps> = (
   onManage,
   onSpeak,
   speaking,
-  vocabularyLang,
 }) => {
   const _ = useTranslation();
   return (
@@ -618,9 +536,6 @@ export const DictionaryResultsHeader: React.FC<DictionaryResultsHeaderProps> = (
           ) : null}
         </div>
       </div>
-      {vocabularyLang && normalizeWordKey(currentWord) ? (
-        <VocabularyChips word={currentWord} lang={vocabularyLang} />
-      ) : null}
     </div>
   );
 };

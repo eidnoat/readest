@@ -558,23 +558,6 @@ describe('RSVPOverlay — dictionary lookup (#4475)', () => {
     expect(popup!.getAttribute('data-word')).toBe('serendipity');
   });
 
-  test('saves the lookup to the vocabulary under the book (#789)', () => {
-    const book = { lang: 'en', hash: 'b1', title: 'Dune', author: 'Herbert' };
-    const { container } = renderOverlay(wordsState(), undefined, undefined, {
-      vocabularyBook: book,
-    });
-    const panel = container.querySelector('[data-testid="rsvp-context-panel"]') as HTMLElement;
-    mockSelection('serendipity', panel);
-    fireEvent.mouseUp(panel);
-    fireEvent.click(container.querySelector('[aria-label="Look up"]') as HTMLElement);
-    const popup = container.querySelector('[data-testid="rsvp-dict-popup"]')!;
-    const capture = JSON.parse(popup.getAttribute('data-capture')!);
-    expect(capture).toMatchObject({
-      lang: 'en',
-      occurrence: { sentence: 'serendipity', bookHash: 'b1', bookTitle: 'Dune' },
-    });
-  });
-
   test('clicking outside the popup dismisses it', () => {
     const { container } = renderOverlay(wordsState());
     const panel = container.querySelector('[data-testid="rsvp-context-panel"]') as HTMLElement;
