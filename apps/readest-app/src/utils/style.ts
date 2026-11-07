@@ -530,6 +530,7 @@ const getPageLayoutStyles = (
   html, body {
     ${writingMode === 'auto' ? '' : `writing-mode: ${writingMode} !important;`}
     max-height: unset;
+    overscroll-behavior-x: none;
     -webkit-touch-callout: none;
     -webkit-user-select: text;
   }
@@ -1994,7 +1995,7 @@ export const getOverlayerBlendMode = ({
   isBwEink,
   isFixedLayout = false,
   invertImgColorInDark = false,
-  applyThemeToPDF = false,
+  applyThemeToPDF: _applyThemeToPDF = false,
   format,
 }: {
   isDarkMode: boolean;
@@ -2006,8 +2007,7 @@ export const getOverlayerBlendMode = ({
 }): 'difference' | 'screen' | 'multiply' => {
   if (isBwEink) return 'difference';
   if (!isDarkMode) return 'multiply';
-  const isDarkPage =
-    !isFixedLayout || invertImgColorInDark || (format === 'PDF' && applyThemeToPDF);
+  const isDarkPage = !isFixedLayout || invertImgColorInDark || format === 'PDF';
   return isDarkPage ? 'screen' : 'multiply';
 };
 
@@ -2047,12 +2047,15 @@ export const applyFixedlayoutStyles = (
   const imgFilters: string[] = [];
   // The renderer already recolors a themed PDF page, images included when they
   // are to be inverted; inverting or blending it again would darken or flip the
-  // theme colors (#6548).
+  // theme colors (#6548). When not recolored by the renderer, PDF pages always
+  // invert in dark mode across all platforms.
   const isThemedPDF = format === 'PDF' && viewSettings.applyThemeToPDF;
+  const shouldInvertInDark =
+    isDarkMode && !isThemedPDF && (invertImgColorInDark || format === 'PDF');
   const transparentImages = !!viewSettings.transparentImageBackground && format !== 'PDF';
   if (transparentImages) imgFilters.push(WHITE_TRANSPARENCY_FILTER);
   // hue-rotate flips the hues back, so a blue link stays blue
-  if (isDarkMode && invertImgColorInDark && !isThemedPDF) {
+  if (shouldInvertInDark) {
     imgFilters.push('invert(100%) hue-rotate(180deg)');
   }
   if (contrast !== 100) imgFilters.push(`contrast(${contrast}%)`);

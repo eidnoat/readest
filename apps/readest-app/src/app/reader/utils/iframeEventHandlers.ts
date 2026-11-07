@@ -478,6 +478,18 @@ const isFixedLayoutScrollingY = (event: WheelEvent) => {
 };
 
 export const handleWheel = (bookKey: string, event: WheelEvent) => {
+  // Prevent horizontal two-finger trackpad swipes from triggering the browser's
+  // native back/forward history navigation gesture while reading.
+  if (!event.ctrlKey && Math.abs(event.deltaX) > Math.abs(event.deltaY) && event.cancelable) {
+    const target = event.target instanceof Element ? event.target : null;
+    const scrollWrapper = target?.closest('.readest-scroll-wrapper');
+    const canScrollWrapperHorizontally =
+      scrollWrapper instanceof HTMLElement &&
+      scrollWrapper.scrollWidth > scrollWrapper.clientWidth + 1;
+    if (!canScrollWrapperHorizontally) {
+      event.preventDefault();
+    }
+  }
   window.postMessage(
     {
       type: 'iframe-wheel',

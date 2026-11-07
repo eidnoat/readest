@@ -159,6 +159,11 @@ describe('PDF dark mode (#6548)', () => {
     expect(css).toContain('filter: invert(100%) hue-rotate(180deg);');
   });
 
+  it('inverts PDF pages automatically in dark mode even when invertImgColorInDark is false', () => {
+    const css = fixedLayoutCss(makeViewSettings({ invertImgColorInDark: false }), darkTheme, 'PDF');
+    expect(css).toContain('filter: invert(100%) hue-rotate(180deg);');
+  });
+
   it('does not invert a PDF page the renderer already recolored to the theme', () => {
     const vs = makeViewSettings({ invertImgColorInDark: true, applyThemeToPDF: true });
     expect(fixedLayoutCss(vs, darkTheme, 'PDF')).not.toContain('invert(');

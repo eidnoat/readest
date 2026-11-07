@@ -57,6 +57,30 @@ describe('createWheelGestureDetector', () => {
     expect(detector.feed(sample({ deltaX: 40, timeStamp: 1000 }))).not.toBeNull();
   });
 
+  test('unlocks immediately when the user swipes in the opposite direction during momentum', () => {
+    const detector = createWheelGestureDetector({ threshold: 30, idleResetMs: 200 });
+    expect(detector.feed(sample({ deltaX: 40, timeStamp: 0 }))).not.toBeNull();
+    // Reverse swipe within the 200ms idle window should accumulate and flip back.
+    expect(detector.feed(sample({ deltaX: -18, timeStamp: 40 }))).toBeNull();
+    const flipBack = detector.feed(sample({ deltaX: -18, timeStamp: 56 }));
+    expect(flipBack).not.toBeNull();
+    expect(flipBack!.deltaX).toBeLessThan(0);
+  });
+
+  test('recognizes a fresh same-direction swipe when velocity spikes after momentum decay', () => {
+    const detector = createWheelGestureDetector({ threshold: 30, idleResetMs: 200 });
+    expect(detector.feed(sample({ deltaX: 40, timeStamp: 0 }))).not.toBeNull();
+    // Momentum tail decays continuously without any 200ms idle gap.
+    expect(detector.feed(sample({ deltaX: 12, timeStamp: 50 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 4, timeStamp: 120 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 2, timeStamp: 180 }))).toBeNull();
+    // User performs a second swipe while tail is still trickling (no 200ms gap):
+    expect(detector.feed(sample({ deltaX: 16, timeStamp: 220 }))).toBeNull();
+    const secondFlip = detector.feed(sample({ deltaX: 18, timeStamp: 236 }));
+    expect(secondFlip).not.toBeNull();
+    expect(secondFlip!.deltaX).toBeGreaterThan(0);
+  });
+
   test('resolves to the dominant axis, ignoring cross-axis noise', () => {
     const detector = createWheelGestureDetector({ threshold: 30 });
     // Large horizontal travel with small vertical jitter.

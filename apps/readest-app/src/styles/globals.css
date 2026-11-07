@@ -252,10 +252,15 @@
    sub-layers) yield to these rules. Left unlayered, these would outrank every
    utility, e.g. `w-44` could no longer override `:where(.dropdown-content)`. */
 @layer utilities {
+  :root,
+  body {
+    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+  }
+
   :root {
     border-radius: 10px;
     scrollbar-gutter: auto !important;
-    overscroll-behavior: none;
     background-color: transparent;
 
     --scroll-bg-color: var(--color-base-200);

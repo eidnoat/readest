@@ -40,44 +40,74 @@ export const useMouseEvent = (
   if (!wheelDetectorRef.current) {
     wheelDetectorRef.current = createWheelGestureDetector();
   }
+  const processWheelSample = (data: {
+    bookKey: string;
+    ctrlKey?: boolean;
+    nativeScrollY?: boolean;
+    deltaX?: number;
+    deltaY?: number;
+    deltaMode?: number;
+    screenX?: number;
+    screenY?: number;
+    clientX?: number;
+    clientY?: number;
+    offsetX?: number;
+    offsetY?: number;
+  }) => {
+    if (data.ctrlKey) {
+      // Pinch/ctrl-wheel zoom is not a page-turn gesture — drop any
+      // travel accumulated so far so it can't bleed into a later flip.
+      wheelDetectorRef.current!.reset();
+      if ((data.deltaY ?? 0) > 0) {
+        eventDispatcher.dispatch('zoom-out', { factor: Math.abs(data.deltaY ?? 0) / 100 });
+      } else if ((data.deltaY ?? 0) < 0) {
+        eventDispatcher.dispatch('zoom-in', { factor: Math.abs(data.deltaY ?? 0) / 100 });
+      }
+    } else if (data.nativeScrollY) {
+      // The page scrolls within itself (fit-width or zoomed PDF): this
+      // gesture belongs to the scroll, and only a fresh one at the edge
+      // turns the page.
+      wheelDetectorRef.current!.suppress(Date.now());
+    } else {
+      const flip = wheelDetectorRef.current!.feed({
+        deltaX: data.deltaX ?? 0,
+        deltaY: data.deltaY ?? 0,
+        deltaMode: data.deltaMode ?? 0,
+        timeStamp: Date.now(),
+      });
+      if (flip) {
+        handlePageFlipRef.current(
+          new MessageEvent('message', {
+            data: { ...data, type: 'iframe-wheel', deltaX: flip.deltaX, deltaY: flip.deltaY },
+          }),
+        );
+      }
+    }
+  };
+
   const handleMouseEvent = (msg: MessageEvent | React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (msg instanceof MessageEvent) {
       if (msg.data && msg.data.bookKey === bookKey) {
         if (msg.data.type === 'iframe-wheel') {
-          if (msg.data.ctrlKey) {
-            // Pinch/ctrl-wheel zoom is not a page-turn gesture — drop any
-            // travel accumulated so far so it can't bleed into a later flip.
-            wheelDetectorRef.current!.reset();
-            if (msg.data.deltaY > 0) {
-              eventDispatcher.dispatch('zoom-out', { factor: Math.abs(msg.data.deltaY) / 100 });
-            } else if (msg.data.deltaY < 0) {
-              eventDispatcher.dispatch('zoom-in', { factor: Math.abs(msg.data.deltaY) / 100 });
-            }
-          } else if (msg.data.nativeScrollY) {
-            // The page scrolls within itself (fit-width or zoomed PDF): this
-            // gesture belongs to the scroll, and only a fresh one at the edge
-            // turns the page.
-            wheelDetectorRef.current!.suppress(Date.now());
-          } else {
-            const flip = wheelDetectorRef.current!.feed({
-              deltaX: msg.data.deltaX ?? 0,
-              deltaY: msg.data.deltaY ?? 0,
-              deltaMode: msg.data.deltaMode ?? 0,
-              timeStamp: Date.now(),
-            });
-            if (flip) {
-              handlePageFlipRef.current(
-                new MessageEvent('message', {
-                  data: { ...msg.data, deltaX: flip.deltaX, deltaY: flip.deltaY },
-                }),
-              );
-            }
-          }
+          processWheelSample(msg.data);
         } else {
           handlePageFlip(msg);
         }
       }
-    } else if (msg.type !== 'wheel') {
+    } else if (msg.type === 'wheel') {
+      const wheelEv = msg as unknown as React.WheelEvent<HTMLDivElement>;
+      processWheelSample({
+        bookKey,
+        ctrlKey: wheelEv.ctrlKey,
+        deltaX: wheelEv.deltaX,
+        deltaY: wheelEv.deltaY,
+        deltaMode: wheelEv.deltaMode,
+        screenX: wheelEv.screenX,
+        screenY: wheelEv.screenY,
+        clientX: wheelEv.clientX,
+        clientY: wheelEv.clientY,
+      });
+    } else {
       handlePageFlip(msg);
     }
   };

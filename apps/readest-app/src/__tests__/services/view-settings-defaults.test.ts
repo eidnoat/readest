@@ -89,4 +89,21 @@ describe('view settings defaults', () => {
   it('defaults scrolledDirection to vertical (readest#4995)', () => {
     expect(DEFAULT_BOOK_LAYOUT.scrolledDirection).toBe('vertical');
   });
+
+  it('applies web/desktop default font, spacing, and push animation settings', () => {
+    const settings = getDefaultViewSettings({
+      fs: {} as FileSystem,
+      isDesktopApp: false,
+      isMobile: false,
+      isTablet: false,
+      isEink: false,
+      isAppDataSandbox: false,
+    });
+    expect(settings.defaultFontSize).toBe(23);
+    expect(settings.paragraphMargin).toBe(0.6);
+    expect(settings.lineHeight).toBe(1.4);
+    expect(settings.letterSpacing).toBe(2);
+    expect(settings.animated).toBe(true);
+    expect(settings.pageTurnStyle).toBe('push');
+  });
 });

@@ -214,6 +214,22 @@ const FoliateViewer: React.FC<{
     };
   }, []);
 
+  // Prevent horizontal two-finger trackpad swipes anywhere on the outer reader
+  // container (margins, header/footer gaps) from triggering browser back/forward.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onNativeWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && Math.abs(event.deltaX) > Math.abs(event.deltaY) && event.cancelable) {
+        event.preventDefault();
+      }
+    };
+    el.addEventListener('wheel', onNativeWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onNativeWheel);
+    };
+  }, []);
+
   useAutoFocus<HTMLDivElement>({ ref: containerRef });
 
   useDiscordPresence(
@@ -660,7 +676,9 @@ const FoliateViewer: React.FC<{
             bookData?.book?.format === 'CBZ',
           ),
         );
-        detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey));
+        detail.doc.addEventListener('wheel', handleWheel.bind(null, bookKey), {
+          passive: false,
+        });
         detail.doc.addEventListener('touchstart', handleTouchStart.bind(null, bookKey));
         detail.doc.addEventListener('touchmove', handleTouchMove.bind(null, bookKey), {
           passive: false,

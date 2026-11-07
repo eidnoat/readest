@@ -16,10 +16,7 @@ describe('getOverlayerBlendMode', () => {
     expect(getOverlayerBlendMode({ isDarkMode: true, isBwEink: true })).toBe('difference');
   });
 
-  // #5790 / #5930 / #5943: a PDF keeps the book's own white bitmap in dark mode
-  // unless the reader asked us to darken it, and `screen` over white paints no
-  // band at all — it only tints the glyphs.
-  it('multiplies over a PDF that stays light in dark mode', () => {
+  it('screens over a PDF in dark mode because PDF pages are inverted by default', () => {
     expect(
       getOverlayerBlendMode({
         isDarkMode: true,
@@ -27,7 +24,7 @@ describe('getOverlayerBlendMode', () => {
         isFixedLayout: true,
         format: 'PDF',
       }),
-    ).toBe('multiply');
+    ).toBe('screen');
   });
 
   it('screens over a PDF the reader inverted into dark mode', () => {

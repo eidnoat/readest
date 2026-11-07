@@ -44,6 +44,15 @@ const DEFAULT_IDLE_RESET_MS = 200;
 const DEFAULT_LINE_HEIGHT = 40;
 const DEFAULT_PAGE_HEIGHT = 800;
 
+// Minimum cooldown (ms) after a flip before a velocity spike on the same axis
+// can be recognized as a fresh deliberate swipe interrupting the momentum tail.
+const RE_SWIPE_COOLDOWN_MS = 180;
+// Minimum normalized delta (px) for a sample to qualify as a re-swipe spike.
+const RE_SWIPE_MIN_DELTA_PX = 8;
+// Factor by which the current sample must exceed the decayed tail minimum to
+// count as a fresh finger acceleration rather than inertial decay.
+const RE_SWIPE_SPIKE_RATIO = 1.8;
+
 export const createWheelGestureDetector = (options: WheelGestureOptions = {}) => {
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
   const idleResetMs = options.idleResetMs ?? DEFAULT_IDLE_RESET_MS;
@@ -54,53 +63,109 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
   let accumY = 0;
   let lastTime = -Infinity;
   // True once a flip has fired for the current gesture: the remaining events
-  // are the momentum tail and must be ignored until the wheel goes idle.
+  // are the momentum tail and must be ignored until the wheel goes idle or a
+  // new deliberate gesture interrupts the tail.
   let flipped = false;
+  let flipTime = -Infinity;
+  let flipAxis: 'x' | 'y' | null = null;
+  let flipSign = 0;
+  let tailMinAbs = Infinity;
 
   const normalize = (delta: number, mode: number) =>
     mode === 1 ? delta * lineHeight : mode === 2 ? delta * pageHeight : delta;
+
+  const clearFlipLock = () => {
+    accumX = 0;
+    accumY = 0;
+    flipped = false;
+    flipAxis = null;
+    flipSign = 0;
+    tailMinAbs = Infinity;
+  };
 
   /**
    * Feed one wheel sample. Returns the axis-resolved delta to flip by, or
    * `null` when the sample should not (yet) trigger a page turn.
    */
   const feed = (sample: WheelSample): WheelFlipResult | null => {
+    const dx = normalize(sample.deltaX, sample.deltaMode);
+    const dy = normalize(sample.deltaY, sample.deltaMode);
+
     // A gap longer than idleResetMs means the previous gesture (including any
     // inertial momentum tail) has ended — start a fresh gesture.
     if (sample.timeStamp - lastTime > idleResetMs) {
-      accumX = 0;
-      accumY = 0;
-      flipped = false;
+      clearFlipLock();
     }
     lastTime = sample.timeStamp;
 
-    // Already flipped for this gesture: swallow the momentum tail.
-    if (flipped) return null;
+    if (flipped) {
+      if (flipAxis !== null) {
+        const dominantAxis: 'x' | 'y' = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+        const dominantDelta = dominantAxis === 'x' ? dx : dy;
+        const absDominant = Math.abs(dominantDelta);
+        const axisDelta = flipAxis === 'x' ? dx : dy;
+        const absAxis = Math.abs(axisDelta);
 
-    accumX += normalize(sample.deltaX, sample.deltaMode);
-    accumY += normalize(sample.deltaY, sample.deltaMode);
+        // 1. Axis switch or opposite direction swipe immediately starts a new gesture.
+        const switchedAxis = dominantAxis !== flipAxis && absDominant >= RE_SWIPE_MIN_DELTA_PX;
+        const reversedDirection =
+          dominantAxis === flipAxis &&
+          Math.sign(axisDelta) !== 0 &&
+          Math.sign(axisDelta) !== flipSign &&
+          absAxis >= 4;
+
+        // 2. Same-direction re-swipe during an inertial momentum tail: once the
+        // tail has decayed and the user's fingers accelerate the trackpad again
+        // after a short cooldown, unlock so rapid consecutive swipes aren't
+        // swallowed by a 500–1000ms OS momentum tail.
+        const spikedAfterDecay =
+          sample.timeStamp - flipTime >= RE_SWIPE_COOLDOWN_MS &&
+          absAxis >= RE_SWIPE_MIN_DELTA_PX &&
+          tailMinAbs < Infinity &&
+          (tailMinAbs <= 2 || absAxis >= tailMinAbs * RE_SWIPE_SPIKE_RATIO);
+
+        if (switchedAxis || reversedDirection || spikedAfterDecay) {
+          clearFlipLock();
+        } else {
+          if (absAxis < tailMinAbs) {
+            tailMinAbs = absAxis;
+          }
+          return null;
+        }
+      } else {
+        // Suppressed by native scroll (`suppress()`): wait for the idle gap.
+        return null;
+      }
+    }
+
+    accumX += dx;
+    accumY += dy;
 
     if (Math.abs(accumX) < threshold && Math.abs(accumY) < threshold) {
       return null;
     }
 
+    const isHorizontal = Math.abs(accumX) > Math.abs(accumY);
     flipped = true;
+    flipTime = sample.timeStamp;
+    flipAxis = isHorizontal ? 'x' : 'y';
+    flipSign = Math.sign(isHorizontal ? accumX : accumY);
+    tailMinAbs = Math.abs(isHorizontal ? dx : dy);
+
     // Resolve to the dominant axis so a tiny amount of cross-axis noise
     // doesn't flip in the wrong direction.
-    const result: WheelFlipResult =
-      Math.abs(accumX) > Math.abs(accumY)
-        ? { deltaX: accumX, deltaY: 0 }
-        : { deltaX: 0, deltaY: accumY };
+    const result: WheelFlipResult = isHorizontal
+      ? { deltaX: accumX, deltaY: 0 }
+      : { deltaX: 0, deltaY: accumY };
     accumX = 0;
     accumY = 0;
     return result;
   };
 
   const reset = () => {
-    accumX = 0;
-    accumY = 0;
     lastTime = -Infinity;
-    flipped = false;
+    flipTime = -Infinity;
+    clearFlipLock();
   };
 
   /**
@@ -109,8 +174,7 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
    * the ticks that land once the page reaches its edge — can't flip the page.
    */
   const suppress = (timeStamp: number) => {
-    accumX = 0;
-    accumY = 0;
+    clearFlipLock();
     lastTime = timeStamp;
     flipped = true;
   };

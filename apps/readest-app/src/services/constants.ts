@@ -365,7 +365,7 @@ export const DEFAULT_BOOK_FONT: BookFont = {
   ignorePublisherFonts: [],
   defaultFont: 'Serif',
   defaultCJKFont: 'LXGW WenKai GB Screen',
-  defaultFontSize: 16,
+  defaultFontSize: 23,
   minimumFontSize: 8,
   fontWeight: 400,
 };
@@ -417,7 +417,7 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   paragraphMargin: 0.6,
   lineHeight: 1.4,
   wordSpacing: 0,
-  letterSpacing: 0,
+  letterSpacing: 2,
   textIndent: 0,
   fullJustification: true,
   hyphenation: true,
@@ -482,8 +482,9 @@ export const DEFAULT_TABLET_VIEW_SETTINGS: Partial<ViewSettings> = {
 export const DEFAULT_CJK_VIEW_SETTINGS: Partial<ViewSettings> = {
   fullJustification: true,
   textIndent: 2,
-  paragraphMargin: 1,
-  lineHeight: 1.6,
+  paragraphMargin: 0.6,
+  lineHeight: 1.4,
+  letterSpacing: 2,
 };
 
 export const DEFAULT_FIXED_LAYOUT_VIEW_SETTINGS: Partial<ViewSettings> = {
@@ -532,7 +533,7 @@ export const DEFAULT_VIEW_CONFIG: ViewConfig = {
   headerFooterBackground: 'auto',
   headerFooterBgOpacity: 0.85,
 
-  animated: false,
+  animated: true,
   pageTurnStyle: 'push',
   isEink: false,
   isColorEink: false,
