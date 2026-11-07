@@ -21,6 +21,7 @@ import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 @InvokeArg
