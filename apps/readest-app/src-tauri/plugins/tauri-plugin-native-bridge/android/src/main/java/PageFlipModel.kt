@@ -71,15 +71,15 @@ internal class PageFlipModel {
         private const val PROPAGATION_SPEED_SCALE = 1.15
         // Drag tuning; a tap uses the automatic-turn tuning in play().
         private const val RELEASE_X = 0.72
-        private const val LIFT_VELOCITY = 1.35
+        private const val LIFT_VELOCITY = 1.15
         private const val LIFT_TO_LEFT = 2.0
         private const val CURVATURE_RELAXATION = 7.0
-        private const val MIN_SPEED_SCALE = 0.95
-        private const val MAX_SPEED_SCALE = 2.0
-        private const val VELOCITY_GAIN = 0.6
+        private const val MIN_SPEED_SCALE = 0.9
+        private const val MAX_SPEED_SCALE = 1.75
+        private const val VELOCITY_GAIN = 0.5
         private const val IDLE_DECAY_SECONDS = 0.09
         /** A tap plays the automatic turn this many times its natural pace. */
-        private const val TAP_PLAYBACK = 1.6
+        private const val TAP_PLAYBACK = 1.25
         private const val CAMERA_DISTANCE = 4.0
         private const val MAX_PERSPECTIVE_SCALE = 1.34
         private const val MIN_SHADOW_WIDTH = 0.045

@@ -38,6 +38,8 @@ import {
   TTS_STOP_AT_CHAPTER_END,
 } from '@/services/tts/TTSSessionManager';
 import { getAnnotationOverlayColor } from '../utils/annotatorUtil';
+import { isLayeredTurnTouchActive } from '../utils/iframeEventHandlers';
+import { NATIVE_PROGRAMMATIC_TURN_ATTRIBUTE } from '../utils/turnGestureArena';
 
 interface UseTTSControlProps {
   bookKey: string;
@@ -100,6 +102,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
   const followingTTSLocationRef = useRef(true);
   const sectionChangingTimestampRef = useRef(0);
   const pageFollowTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pageTurningRef = useRef(false);
   const previousSectionLabelRef = useRef<string | undefined>(undefined);
   const ttsControllerRef = useRef<TTSController | null>(null);
   const isStartingTTSRef = useRef(false);
@@ -415,6 +418,11 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       });
     };
 
+    const isTurnInFlight = (view: ReturnType<typeof getView>) =>
+      pageTurningRef.current ||
+      isLayeredTurnTouchActive(bookKey) ||
+      !!view?.renderer.hasAttribute?.(NATIVE_PROGRAMMATIC_TURN_ATTRIBUTE);
+
     const stopPageFollow = () => {
       if (pageFollowTimerRef.current === null) return;
       clearInterval(pageFollowTimerRef.current);
@@ -470,6 +478,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           stopPageFollow();
           return;
         }
+        if (isTurnInFlight(currentView)) return;
         const contents = currentView.renderer.getContents();
         if (contents.some(({ doc }) => (doc.getSelection()?.toString().length ?? 0) > 0)) return;
         if (isTypingNote()) return;
@@ -487,7 +496,16 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
           stopPageFollow();
           return;
         }
-        if (progress >= breakFraction) currentView.renderer.next();
+        if (progress >= breakFraction) {
+          pageTurningRef.current = true;
+          Promise.resolve(
+            typeof currentView.next === 'function'
+              ? currentView.next()
+              : currentView.renderer.next(),
+          ).finally(() => {
+            pageTurningRef.current = false;
+          });
+        }
       }, PAGE_FOLLOW_INTERVAL_MS);
     };
 
@@ -548,6 +566,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       // A drag preview is an explicit "show me there" gesture: it navigates
       // even when auto-follow was suppressed by the user paging away.
       if (!preview && !followingTTSLocationRef.current) return;
+      if (!preview && isTurnInFlight(view)) return;
 
       if (hlContents.some(({ doc }) => (doc.getSelection()?.toString().length ?? 0) > 0)) {
         return;
@@ -597,7 +616,15 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     const handleHighlightWord = (e: Event) => {
       const { cfi } = (e as CustomEvent<{ cfi: string }>).detail;
       const view = getView(bookKey);
-      if (!cfi || !view || !followingTTSLocationRef.current || isTypingNote()) return;
+      if (
+        !cfi ||
+        !view ||
+        !followingTTSLocationRef.current ||
+        isTypingNote() ||
+        isTurnInFlight(view)
+      ) {
+        return;
+      }
 
       const hlContents = view.renderer.getContents();
       const hlPrimaryIdx = view.renderer.primaryIndex;
@@ -720,6 +747,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     // page behind once the view follows the voice, so a recording — which has no
     // word cfi to fall back on — needs the layout asked directly.
     if (isCfiInLocation(highlightCfi, location) || ttsController.isSoundingSentenceOnScreen()) {
+      followingTTSLocationRef.current = true;
       setShowBackToCurrentTTSLocation(false);
       // Word-aware re-apply: re-draws the current word during word-by-word
       // playback instead of redrawing the whole sentence over it.
@@ -727,6 +755,7 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
     } else {
       const msSinceSectionChange = Date.now() - sectionChangingTimestampRef.current;
       if (msSinceSectionChange < 2000) return;
+      followingTTSLocationRef.current = false;
       setShowBackToCurrentTTSLocation(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

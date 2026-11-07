@@ -67,6 +67,7 @@ export class NativePageTurn extends CapturedPageTurn {
   #turn = 0;
   #cancellations = new Set<Promise<unknown>>();
   #invalidations: Promise<unknown> = Promise.resolve();
+  #dirtyAfterScene = false;
 
   constructor(
     private host: CapturedTurnHost,
@@ -232,6 +233,11 @@ export class NativePageTurn extends CapturedPageTurn {
   /** Advance the pixel generation and serialize invalidation of resident native textures. */
   invalidateNativePages() {
     this.#abort?.abort();
+    if (this.#scene || this.#session) {
+      this.#dirtyAfterScene = true;
+      return;
+    }
+    this.#dirtyAfterScene = false;
     this.#generation++;
     this.#keys.clear();
     if (!this.#dead) {
@@ -317,18 +323,23 @@ export class NativePageTurn extends CapturedPageTurn {
         await this.#restore(scene);
         throw error;
       } finally {
-        if (this.#scene === scene && (!this.#allowed() || !this.#keys.size))
-          await this.#restore(scene);
+        if (this.#scene === scene && !this.#allowed()) await this.#restore(scene);
       }
     });
     const ready = run.then(
       async (started) => {
         if (!started && this.#scene?.session === session) await this.#restore(this.#scene);
         if (!started && this.#session === session) this.#session = null;
+        if (!started && this.#dirtyAfterScene && !this.#scene && !this.#session) {
+          this.invalidateNativePages();
+        }
         return started;
       },
       (error) => {
         if (this.#session === session) this.#session = null;
+        if (this.#dirtyAfterScene && !this.#scene && !this.#session) {
+          this.invalidateNativePages();
+        }
         throw error;
       },
     );
@@ -398,6 +409,9 @@ export class NativePageTurn extends CapturedPageTurn {
         throw error;
       } finally {
         if (this.#scene === scene) this.#scene = null;
+        if (this.#dirtyAfterScene && !this.#scene && !this.#session) {
+          this.invalidateNativePages();
+        }
       }
     });
     this.#queue = run.catch(() => {});

@@ -638,6 +638,9 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
       }
       if (!changed) return;
       invalidatePagePixels();
+      if (controller.active || dragRef.current || programmaticTurnsInFlightRef.current.size > 0) {
+        return;
+      }
       invalidateAndSchedulePreparedCapture();
     });
     // An overlay is attached after foliate's create-overlay event, so pick up
@@ -947,8 +950,10 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
         // soon as the finger lands. A later beginDrag joins that promise.
         // Keep the brightness strip out of this speculative path because its
         // touch is reserved for changing the live page appearance.
+        const currentViewState = useReaderStore.getState().viewStates[bookKey];
         if (
           !gestureClaimed.current &&
+          !currentViewState?.ttsEnabled &&
           !preparedPixelsBlocked &&
           !currentView.renderer.scrollLocked &&
           !intent.earlyClaimBlocked &&
@@ -1063,12 +1068,10 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
             releaseSamples: [{ distance: 0, time: 0 }],
             lastMovementTime: 0,
           };
-          if (style !== 'curl') {
-            startedState.visualOriginDistance = Math.max(
-              0,
-              dragDistance(startedState, detail.deltaX, viewSettings.rtl),
-            );
-          }
+          startedState.visualOriginDistance = Math.max(
+            0,
+            dragDistance(startedState, detail.deltaX, viewSettings.rtl),
+          );
           updateDragSample(startedState, detail, viewSettings.rtl);
           dragRef.current = startedState;
           if (startedState.edgeTurn) edgeTurnRef.current = startedState.edgeTurn;
@@ -1113,21 +1116,21 @@ export const useCapturedTurn = (bookKey: string, viewRef: React.RefObject<Foliat
         return true;
       }
       const signed = dragDistance(state, detail.deltaX, viewSettings?.rtl ?? false);
-      const fullGestureVelocity = signed / (detail.deltaT || 1);
       const releaseVelocity = getReleaseVelocity(state);
-      // Slide and push project the release velocity forward over a short
-      // horizon: distance and speed contribute continuously instead of
-      // crossing two independent hard thresholds. Curl preserves the existing
-      // whole-gesture 0.3px/ms-or-halfway rule.
+      // Project the release velocity forward over a short horizon so distance
+      // and speed contribute continuously instead of committing on stale
+      // early-touch velocity or reversing flicks.
       const releaseProgress = Math.max(0, Math.min(1, signed / state.releaseWidth));
       const projectedProgress =
         releaseProgress + (releaseVelocity * SLIDE_RELEASE_PROJECTION_MS) / state.releaseWidth;
       const commit =
         state.style !== 'curl'
           ? projectedProgress > 0.5
-          : fullGestureVelocity > 0.3
+          : releaseVelocity > 0.35
             ? true
-            : releaseProgress > 0.5;
+            : releaseVelocity < -0.25
+              ? false
+              : projectedProgress > 0.45;
       // CapturedPageTurn serializes endDrag behind an in-flight beginDrag, so
       // queue release immediately. This also keeps a following gesture behind
       // the complete begin/end pair instead of letting it supersede the turn.
@@ -1157,12 +1160,12 @@ const getPagesWidth = (view: FoliateView, cellWidth: number) => {
 
 const dragProgress = (state: DragState, deltaX: number, rtl: boolean) => {
   const signed = dragDistance(state, deltaX, rtl);
-  // Slide and push start visually flat at the claim point, avoiding a
-  // first-frame jump by the distance consumed during gesture recognition.
-  // Release intent is calculated separately from the full touchstart-relative
-  // distance.
-  const visualDistance = state.style !== 'curl' ? signed - state.visualOriginDistance : signed;
-  return Math.max(0, Math.min(1, visualDistance / state.width));
+  // Start visually flat at the claim point, avoiding a first-frame jump by
+  // the distance consumed during gesture recognition. Release intent is
+  // calculated separately from the full touchstart-relative distance.
+  const visualDistance = signed - state.visualOriginDistance;
+  const span = state.style === 'curl' ? state.width * 1.35 : state.width;
+  return Math.max(0, Math.min(1, visualDistance / Math.max(span, 1)));
 };
 
 const createTurnGestureIntent = (

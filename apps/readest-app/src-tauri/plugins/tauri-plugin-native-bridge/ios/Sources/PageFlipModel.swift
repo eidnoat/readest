@@ -72,15 +72,15 @@ final class PageFlipModel {
   private static let propagationSpeedScale = 1.15
   // Drag tuning; a tap uses the automatic-turn tuning in play().
   private static let defaultReleaseX = 0.72
-  private static let defaultLiftVelocity = 1.35
+  private static let defaultLiftVelocity = 1.15
   private static let defaultLiftToLeft = 2.0
   private static let curvatureRelaxation = 7.0
-  private static let minSpeedScale = 0.95
-  private static let maxSpeedScale = 2.0
-  private static let velocityGain = 0.6
+  private static let minSpeedScale = 0.9
+  private static let maxSpeedScale = 1.75
+  private static let velocityGain = 0.5
   private static let idleDecaySeconds = 0.09
   /// A tap plays the automatic turn this many times its natural pace.
-  private static let tapPlayback = 1.6
+  private static let tapPlayback = 1.25
   private static let cameraDistance = 4.0
   private static let maxPerspectiveScale = 1.34
   private static let minShadowWidth = 0.045

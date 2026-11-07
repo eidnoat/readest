@@ -1475,9 +1475,7 @@ export class CapturedPageTurn {
           : baseDuration;
       const easeOutBlend = releaseBoost * MAX_RELEASE_EASE_OUT_BLEND;
       const easing = (t: number) =>
-        active.style === 'curl'
-          ? easeOutCubic(t)
-          : easeInOutQuad(t) * (1 - easeOutBlend) + easeOutCubic(t) * easeOutBlend;
+        easeInOutQuad(t) * (1 - easeOutBlend) + easeOutCubic(t) * easeOutBlend;
       active.finish = resolve;
 
       const runRafFallback = () => {

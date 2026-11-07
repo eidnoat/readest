@@ -57,15 +57,15 @@ const PRESS_DURATION = 0.12;
 const PROPAGATION_SPEED_SCALE = 1.15;
 // Drag tuning; a tap uses the automatic-turn tuning in play().
 const RELEASE_X = 0.72;
-const LIFT_VELOCITY = 1.35;
+const LIFT_VELOCITY = 1.15;
 const LIFT_TO_LEFT = 2;
 const CURVATURE_RELAXATION = 7;
-const MIN_SPEED_SCALE = 0.95;
-const MAX_SPEED_SCALE = 2;
-const VELOCITY_GAIN = 0.6;
+const MIN_SPEED_SCALE = 0.9;
+const MAX_SPEED_SCALE = 1.75;
+const VELOCITY_GAIN = 0.5;
 const IDLE_DECAY_SECONDS = 0.09;
 /** A tap plays the automatic turn this many times its natural pace. */
-const TAP_PLAYBACK = 1.6;
+const TAP_PLAYBACK = 1.25;
 const CAMERA_DISTANCE = 4;
 const MAX_PERSPECTIVE_SCALE = 1.34;
 const MIN_SHADOW_WIDTH = 0.045;

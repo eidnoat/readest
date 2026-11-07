@@ -64,6 +64,7 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
     @Volatile private var owner = 0
     @Volatile private var generation = 0
     @Volatile private var active = false
+    @Volatile private var covering = false
     private var dragging = false
     private var turnId = 0
     private var bufferedRelease = false
@@ -121,7 +122,7 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
     /** Tear down the failed scene and reject every outstanding request. */
     private fun failAll(message: String) {
         animation?.let { choreographer.removeFrameCallback(it) }; animation = null
-        animationPending = null; active = false; dragging = false; cancelled = true
+        animationPending = null; active = false; covering = false; dragging = false; cancelled = true
         popup?.dismiss(); popup = null
         view?.onFailure = null; view?.dispose(); view = null
         pending.toList().forEach { it.reject(message) }
@@ -229,6 +230,7 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
                 }
                 "cover" -> {
                     turnId = args.turnId
+                    covering = true
                     dragging = false
                     current = args.key; destination = current; forward = true; progress = 0f; grabY = 0.5f
                     flipping = false; view?.setFlip(null)
@@ -243,12 +245,13 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
                     // Preview restoration has reached JS, but its WebView
                     // buffer may still contain the previous neighbouring page.
                     presented(p) {
-                        if (turnId == coveredTurn) view?.alpha = 0.004f
+                        if (turnId == coveredTurn) { covering = false; view?.alpha = 0.004f }
                         p.resolve()
                     }
                 }
                 "start" -> {
                     turnId = args.turnId
+                    covering = false
                     current = args.key; destination = args.destination
                     forward = args.forward; rtl = args.rtl
                     cancelled = false; completeRequested = false
@@ -297,6 +300,7 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
                 "animate" -> if (flipping) animateFlip(args, p) else animate(args, p)
                 "complete" -> { completeRequested = true; p.resolve() }
                 "cancel" -> {
+                    covering = false
                     dragging = false
                     cancelled = true; animationTarget = 0f
                     if (animationPending != null) completeAnimation()
@@ -312,18 +316,19 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
                         if (args.turnId != turnId) {
                             p.resolve(JSObject().put("ready", false).put("cancelled", true)); return@presented
                         }
-                        active = false; dragging = false
+                        active = false; covering = false; dragging = false
                         view?.alpha = if (dirtyAfterFinish) 0f else 0.004f
                         if (dirtyAfterFinish) { view?.clear(false); dirtyAfterFinish = false }
                         p.resolve()
                     }
                 }
                 "invalidate" -> {
+                    val preserve = active || covering
                     captures.values.toList().forEach { it.resolve(JSObject().put("ready", false)) }
                     captures.clear(); latestCapture.clear()
-                    dirtyAfterFinish = active
-                    if (!active) view?.alpha = 0f
-                    view?.clear(active)
+                    dirtyAfterFinish = preserve
+                    if (!preserve) view?.alpha = 0f
+                    view?.clear(preserve)
                     p.resolve()
                 }
                 "dispose" -> { disposeExcept(p); p.resolve() }
@@ -396,7 +401,8 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
     /** Translate the latest native finger position into the current sheet pose. */
     private fun updateFinger() {
         val distance = if (forward != rtl) downX - lastX else lastX - downX
-        progress = (distance / width).coerceIn(0f, 1f)
+        val span = if (flipping) width.toFloat() else width * 1.35f
+        progress = (distance / maxOf(span, 1f)).coerceIn(0f, 1f)
         grabY = 0.5f + (lastY - downY) / height
         if (flipping) dragFlip()
     }
@@ -433,8 +439,11 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
         animationTarget = if (args.commit && !cancelled) 1f else 0f
         val from = progress
         val span = abs(animationTarget - from)
-        val duration = maxOf(120f, minOf(280f, if (abs(args.velocity) > 0.3f)
-            span * width / (abs(args.velocity) * webView.resources.displayMetrics.density) else 280f * span))
+        val velocity = abs(args.velocity)
+        val releaseBoost = ((velocity - 0.3f) / 1.2f).coerceIn(0f, 1f)
+        val playbackRate = 1f + 0.35f * releaseBoost
+        val baseDuration = 380f * span.toDouble().pow(0.75).toFloat()
+        val duration = (baseDuration / playbackRate).coerceIn(180f, 400f)
         if (span < 0.001f) { completeAnimation(); return }
         var last = 0L
         var elapsed = 0f
@@ -446,11 +455,15 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
                 if (last != 0L) elapsed += ((now - last) / 1_000_000f).coerceIn(0f, 50f)
                 last = now
                 // A following gesture accelerates the tail, but cannot erase
-                // a scene before its first curved frame. Keep the 100ms
+                // a scene before its first curved frame. Keep the 120ms
                 // minimum even when completion arrived before animate.
-                val settleDuration = if (completeRequested) minOf(duration, 100f) else duration
+                val settleDuration = if (completeRequested) minOf(duration, 120f) else duration
                 val t = (elapsed / settleDuration).coerceAtMost(1f)
-                val easedT = 1f - (1f - t) * (1f - t) * (1f - t)
+                val easedT = if (from < 0.08f && releaseBoost == 0f) {
+                    if (t < 0.5f) 2f * t * t else 1f - 2f * (1f - t) * (1f - t)
+                } else {
+                    1f - (1f - t) * (1f - t)
+                }
                 progress = from + (animationTarget - from) * easedT
                 if (t < 1f) view?.drawPresented(progress, grabY) { error ->
                     if (animationPending !== p || !p.live) return@drawPresented
@@ -522,7 +535,7 @@ internal class NativePaperTurn(private val activity: Activity, private val webVi
     /** Release the scene and settle outstanding requests except the caller being disposed. */
     private fun disposeExcept(keep: Pending?) {
         animation?.let { choreographer.removeFrameCallback(it) }; animation = null
-        animationPending = null; active = false; dragging = false
+        animationPending = null; active = false; covering = false; dragging = false
         pending.toList().filter { it !== keep }.forEach { it.resolve(JSObject().put("ready", false).put("cancelled", true)) }
         captures.clear()
         popup?.dismiss(); popup = null; view?.onFailure = null; view?.dispose(); view = null

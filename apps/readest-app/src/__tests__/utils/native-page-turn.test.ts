@@ -365,4 +365,33 @@ describe('Android native page-turn pipeline', () => {
       f.controller.dispose();
     }
   });
+
+  it('defers pixel invalidation until an in-flight turn finishes (e.g. during TTS word highlights)', async () => {
+    const f = fixture();
+    let resolveStart!: (result: NativePaperResult) => void;
+    try {
+      f.call.mockImplementation(async (args) => {
+        f.events.push(args.op);
+        if (args.op === 'start') {
+          return new Promise<NativePaperResult>((resolve) => {
+            resolveStart = resolve;
+          });
+        }
+        return { touchTracked: true };
+      });
+      const beginning = f.controller.beginDrag(true, false, 'curl');
+      await vi.waitFor(() => expect(resolveStart).toBeDefined());
+      // Simulate TTS word highlight mutating overlay while start is awaiting native IPC
+      f.controller.invalidateNativePages();
+      expect(f.events).not.toContain('invalidate');
+      resolveStart({ touchTracked: true });
+      expect(await beginning).toBe(true);
+      expect(f.controller.active).toBe(true);
+      await f.controller.endDrag(true);
+      expect(f.navigate).toHaveBeenCalledExactlyOnceWith(true);
+      expect(f.events.at(-1)).toBe('invalidate');
+    } finally {
+      f.controller.dispose();
+    }
+  });
 });

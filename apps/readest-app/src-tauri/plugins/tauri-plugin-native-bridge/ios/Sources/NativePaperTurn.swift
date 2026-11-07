@@ -135,6 +135,7 @@ final class NativePaperTurn {
   private var owner = 0
   private var generation = 0
   private var active = false
+  private var covering = false
   private var dragging = false
   private var turnId = 0
   private var dirtyAfterFinish = false
@@ -219,6 +220,7 @@ final class NativePaperTurn {
     stopAnimation()
     animationPending = nil
     active = false
+    covering = false
     dragging = false
     cancelled = true
     view?.removeFromSuperview()
@@ -341,6 +343,7 @@ final class NativePaperTurn {
       case "cover":
         guard let view else { throw PaperError("Native paper surface missing") }
         turnId = turn
+        covering = true
         dragging = false
         current = args.key ?? ""
         destination = current
@@ -357,13 +360,17 @@ final class NativePaperTurn {
         // Preview restoration has reached JS, but the webview may still
         // present the neighbouring page.
         presented(p) { [weak self] in
-          if self?.turnId == coveredTurn { self?.view?.alpha = 0 }
+          if self?.turnId == coveredTurn {
+            self?.covering = false
+            self?.view?.alpha = 0
+          }
           p.resolve()
         }
       case "start":
         guard let view else { throw PaperError("Native paper surface missing") }
         let released = args.released ?? false
         turnId = turn
+        covering = false
         current = args.key ?? ""
         destination = args.destination ?? ""
         forward = args.forward ?? true
@@ -418,6 +425,7 @@ final class NativePaperTurn {
         completeRequested = true
         p.resolve()
       case "cancel":
+        covering = false
         dragging = false
         cancelled = true
         animationTarget = 0
@@ -438,6 +446,7 @@ final class NativePaperTurn {
           guard let self else { return p.resolve() }
           if turn != self.turnId { return p.resolve(["ready": false, "cancelled": true]) }
           self.active = false
+          self.covering = false
           self.dragging = false
           self.view?.alpha = 0
           if self.dirtyAfterFinish {
@@ -447,12 +456,13 @@ final class NativePaperTurn {
           p.resolve()
         }
       case "invalidate":
+        let preserve = active || covering
         captures.values.forEach { $0.resolve(["ready": false]) }
         captures.removeAll()
         latestCapture.removeAll()
-        dirtyAfterFinish = active
-        if !active { view?.alpha = 0 }
-        view?.clear(preserveScene: active)
+        dirtyAfterFinish = preserve
+        if !preserve { view?.alpha = 0 }
+        view?.clear(preserveScene: preserve)
         p.resolve()
       case "dispose":
         dispose(except: p)
@@ -544,7 +554,8 @@ final class NativePaperTurn {
   /// Translate the latest finger position into the current sheet pose.
   private func updateFinger() {
     let distance = forward != rtl ? down.x - last.x : last.x - down.x
-    progress = Float(min(max(distance / width, 0), 1))
+    let span = flipping ? width : width * 1.35
+    progress = Float(min(max(distance / max(span, 1), 0), 1))
     grabY = Float(0.5 + (last.y - down.y) / height)
     if flipping { dragFlip() }
   }
@@ -595,8 +606,10 @@ final class NativePaperTurn {
     let from = progress
     let span = abs(animationTarget - from)
     let velocity = abs(args.velocity ?? 0)
-    let duration = max(
-      120, min(280, velocity > 0.3 ? Double(span) * Double(width) / velocity : 280 * Double(span)))
+    let releaseBoost = min(max((velocity - 0.3) / 1.2, 0), 1)
+    let playbackRate = 1.0 + 0.35 * releaseBoost
+    let baseDuration = 380.0 * pow(Double(span), 0.75)
+    let duration = max(180, min(400, baseDuration / playbackRate))
     if span < 0.001 { return completeAnimation() }
     var lastTime: CFTimeInterval = 0
     var elapsed = 0.0
@@ -604,10 +617,13 @@ final class NativePaperTurn {
       guard let self, self.animationPending === p, p.live else { return }
       if lastTime != 0 { elapsed += min(max((now - lastTime) * 1000, 0), 50.0) }
       lastTime = now
-      // A following gesture accelerates the tail, keeping the 100 ms minimum.
-      let settle = self.completeRequested ? min(duration, 100) : duration
+      // A following gesture accelerates the tail, keeping the 120 ms minimum.
+      let settle = self.completeRequested ? min(duration, 120) : duration
       let t = min(elapsed / settle, 1)
-      let easedT = 1.0 - pow(1.0 - t, 3.0)
+      let easedT =
+        from < 0.08 && releaseBoost == 0
+        ? (t < 0.5 ? 2.0 * t * t : 1.0 - 2.0 * (1.0 - t) * (1.0 - t))
+        : 1.0 - (1.0 - t) * (1.0 - t)
       self.progress = from + (self.animationTarget - from) * Float(easedT)
       if t < 1 { self.draw() } else { self.completeAnimation() }
     }
@@ -682,6 +698,7 @@ final class NativePaperTurn {
     stopAnimation()
     animationPending = nil
     active = false
+    covering = false
     dragging = false
     pending.filter { $0 !== keep }.forEach { $0.resolve(["ready": false, "cancelled": true]) }
     view?.removeFromSuperview()
