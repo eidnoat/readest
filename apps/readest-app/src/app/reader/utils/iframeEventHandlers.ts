@@ -494,6 +494,7 @@ export const handleWheel = (bookKey: string, event: WheelEvent) => {
     {
       type: 'iframe-wheel',
       bookKey,
+      timeStamp: Date.now(),
       nativeScrollY: isFixedLayoutScrollingY(event),
       deltaMode: event.deltaMode,
       deltaX: event.deltaX,

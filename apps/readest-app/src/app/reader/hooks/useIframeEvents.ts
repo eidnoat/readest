@@ -44,6 +44,7 @@ export const useMouseEvent = (
     bookKey: string;
     ctrlKey?: boolean;
     nativeScrollY?: boolean;
+    timeStamp?: number;
     deltaX?: number;
     deltaY?: number;
     deltaMode?: number;
@@ -54,6 +55,7 @@ export const useMouseEvent = (
     offsetX?: number;
     offsetY?: number;
   }) => {
+    const sampleTime = typeof data.timeStamp === 'number' ? data.timeStamp : Date.now();
     if (data.ctrlKey) {
       // Pinch/ctrl-wheel zoom is not a page-turn gesture — drop any
       // travel accumulated so far so it can't bleed into a later flip.
@@ -67,13 +69,13 @@ export const useMouseEvent = (
       // The page scrolls within itself (fit-width or zoomed PDF): this
       // gesture belongs to the scroll, and only a fresh one at the edge
       // turns the page.
-      wheelDetectorRef.current!.suppress(Date.now());
+      wheelDetectorRef.current!.suppress(sampleTime);
     } else {
       const flip = wheelDetectorRef.current!.feed({
         deltaX: data.deltaX ?? 0,
         deltaY: data.deltaY ?? 0,
         deltaMode: data.deltaMode ?? 0,
-        timeStamp: Date.now(),
+        timeStamp: sampleTime,
       });
       if (flip) {
         handlePageFlipRef.current(

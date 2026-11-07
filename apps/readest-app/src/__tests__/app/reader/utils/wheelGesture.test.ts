@@ -83,29 +83,46 @@ describe('createWheelGestureDetector', () => {
 
   test('does not double-flip on a single swipe with a noisy/jittery momentum tail', () => {
     const detector = createWheelGestureDetector({ threshold: 30, idleResetMs: 200 });
-    // Initial finger swipe triggers the first page turn at t=32ms
+    // Initial finger swipe triggers the first page turn at t=16ms
     expect(detector.feed(sample({ deltaX: 15, timeStamp: 0 }))).toBeNull();
     expect(detector.feed(sample({ deltaX: 20, timeStamp: 16 }))).not.toBeNull();
-    // Long trackpad momentum tail with non-monotonic jitter (e.g. 24 -> 18 -> 2 -> 0 -> 12 -> 10 -> 8 -> 6 -> 4)
+    // Long trackpad momentum tail with non-monotonic jitter AND an early dip
+    // followed by a high-velocity flick and frame-batched 2x jumps (e.g. 11 -> 20)
     const tail = [
-      { deltaX: 24, deltaY: 1, t: 32 },
-      { deltaX: 18, deltaY: 0, t: 48 },
-      { deltaX: 2, deltaY: 1, t: 64 }, // brief finger lift pause
-      { deltaX: 0, deltaY: 1, t: 80 }, // pure cross-axis wobble frame
-      { deltaX: 14, deltaY: 0, t: 96 }, // OS momentum kicks in
-      { deltaX: 12, deltaY: 0, t: 160 },
-      { deltaX: 9, deltaY: 0, t: 210 },
-      { deltaX: 11, deltaY: 0, t: 230 }, // quantization bounce in momentum tail
-      { deltaX: 8, deltaY: 0, t: 260 },
-      { deltaX: 9, deltaY: 0, t: 290 }, // jitter at 290ms
-      { deltaX: 5, deltaY: 0, t: 320 },
-      { deltaX: 3, deltaY: 0, t: 360 },
+      { deltaX: 2, deltaY: 1, t: 32 }, // brief early dip while fingers are still on pad
+      { deltaX: 0, deltaY: 1, t: 48 }, // pure cross-axis wobble frame
+      { deltaX: 36, deltaY: 0, t: 64 }, // strong flick as fingers lift off
+      { deltaX: 28, deltaY: 0, t: 96 },
+      { deltaX: 22, deltaY: 0, t: 160 },
+      { deltaX: 11, deltaY: 0, t: 250 }, // 1-tick frame
+      { deltaX: 20, deltaY: 0, t: 285 }, // 2-tick coalesced frame at >220ms! Must NOT unlock!
+      { deltaX: 12, deltaY: 0, t: 310 },
+      { deltaX: 9, deltaY: 0, t: 340 },
+      { deltaX: 5, deltaY: 0, t: 370 },
+      { deltaX: 3, deltaY: 0, t: 400 },
     ];
     for (const tick of tail) {
       expect(
         detector.feed(sample({ deltaX: tick.deltaX, deltaY: tick.deltaY, timeStamp: tick.t })),
       ).toBeNull();
     }
+  });
+
+  test('does not let 1-2px dying momentum ticks extend lockout and block the next swipe', () => {
+    const detector = createWheelGestureDetector(); // default threshold=20, idleResetMs=140
+    expect(detector.feed(sample({ deltaX: 25, timeStamp: 0 }))).not.toBeNull();
+    // Active tail ends at t=60ms (deltaX=8), then only 1-2px dying ticks trickle until t=220ms
+    expect(detector.feed(sample({ deltaX: 8, timeStamp: 60 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 2, timeStamp: 100 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 1, timeStamp: 150 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 1, timeStamp: 190 }))).toBeNull();
+    // At t=220ms (160ms after last >2.5px tick at t=60ms), a gentle new swipe (8 + 8 + 8 = 24px)
+    // must immediately accumulate and flip!
+    expect(detector.feed(sample({ deltaX: 8, timeStamp: 220 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 8, timeStamp: 236 }))).toBeNull();
+    const secondFlip = detector.feed(sample({ deltaX: 8, timeStamp: 252 }));
+    expect(secondFlip).not.toBeNull();
+    expect(secondFlip!.deltaX).toBeGreaterThan(0);
   });
 
   test('resolves to the dominant axis, ignoring cross-axis noise', () => {

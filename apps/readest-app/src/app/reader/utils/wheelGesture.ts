@@ -39,25 +39,31 @@ export interface WheelGestureOptions {
   pageHeight?: number;
 }
 
-const DEFAULT_THRESHOLD = 30;
-const DEFAULT_IDLE_RESET_MS = 200;
+const DEFAULT_THRESHOLD = 20;
+const DEFAULT_IDLE_RESET_MS = 140;
 const DEFAULT_LINE_HEIGHT = 40;
 const DEFAULT_PAGE_HEIGHT = 800;
 
 // Minimum cooldown (ms) after a flip before a velocity spike on the same axis
 // can be recognized as a fresh deliberate swipe interrupting the momentum tail.
-const RE_SWIPE_COOLDOWN_MS = 280;
-// Minimum normalized delta (px) for a sample to qualify as a re-swipe spike.
-// Inertial momentum tails on macOS/Windows trackpads routinely jitter between
-// 0–8px per tick; requiring a strong acceleration above 18px prevents a single
-// swipe's momentum tail from triggering a second page turn.
-const RE_SWIPE_MIN_DELTA_PX = 18;
-// Factor by which the current sample must exceed the decayed tail minimum to
-// count as a fresh finger acceleration rather than inertial decay jitter.
+// During the first ~180ms after threshold is crossed, the user's fingers are
+// often still on the trackpad finishing the original stroke/flick.
+const RE_SWIPE_COOLDOWN_MS = 220;
+// Minimum normalized delta (px) for a sample to qualify as a re-swipe spike or
+// cross-axis switch.
+const RE_SWIPE_MIN_DELTA_PX = 14;
+// Factor by which the current sample must exceed the decayed recent tail to
+// count as a fresh finger acceleration rather than 2-events-in-1-frame browser
+// batching jitter (which is at most ~2x).
 const RE_SWIPE_SPIKE_RATIO = 2.5;
-// Maximum decayed tail magnitude (px) before a same-direction spike can unlock;
-// ensures the previous swipe's active phase has genuinely wound down.
-const RE_SWIPE_MAX_DECAYED_TAIL_PX = 6;
+// Maximum recent smoothed tail magnitude (px) before a same-direction spike can
+// unlock; ensures the previous swipe's active phase has currently wound down
+// (not merely dipped on a single early frame).
+const RE_SWIPE_MAX_DECAYED_EMA_PX = 6;
+// Sub-pixel / tiny dying tail threshold (px): while locked after a flip, tiny
+// 1–2px dying momentum ticks must not extend `lastTime` for 500ms+ after the
+// gesture is effectively over.
+const DYING_TAIL_NOISE_PX = 2.5;
 
 export const createWheelGestureDetector = (options: WheelGestureOptions = {}) => {
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
@@ -75,8 +81,9 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
   let flipTime = -Infinity;
   let flipAxis: 'x' | 'y' | null = null;
   let flipSign = 0;
-  let tailMinAbs = Infinity;
+  let recentEmaAbs = Infinity;
   let prevAbsAxis = Infinity;
+  let decayedTickCount = 0;
 
   const normalize = (delta: number, mode: number) =>
     mode === 1 ? delta * lineHeight : mode === 2 ? delta * pageHeight : delta;
@@ -87,8 +94,9 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
     flipped = false;
     flipAxis = null;
     flipSign = 0;
-    tailMinAbs = Infinity;
+    recentEmaAbs = Infinity;
     prevAbsAxis = Infinity;
+    decayedTickCount = 0;
   };
 
   /**
@@ -98,13 +106,25 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
   const feed = (sample: WheelSample): WheelFlipResult | null => {
     const dx = normalize(sample.deltaX, sample.deltaMode);
     const dy = normalize(sample.deltaY, sample.deltaMode);
+    const maxAbs = Math.max(Math.abs(dx), Math.abs(dy));
 
     // A gap longer than idleResetMs means the previous gesture (including any
     // inertial momentum tail) has ended — start a fresh gesture.
     if (sample.timeStamp - lastTime > idleResetMs) {
+      // If a single dying momentum tick (<= 2.5px) arrives right after the idle
+      // window, drop it without starting a new gesture.
+      if (flipped && maxAbs <= DYING_TAIL_NOISE_PX) {
+        clearFlipLock();
+        return null;
+      }
       clearFlipLock();
     }
-    lastTime = sample.timeStamp;
+
+    // While locked in the post-flip tail, do not let tiny 1–2px dying momentum
+    // ticks endlessly refresh `lastTime` and block the next swipe.
+    if (!flipped || maxAbs > DYING_TAIL_NOISE_PX) {
+      lastTime = sample.timeStamp;
+    }
 
     if (flipped) {
       if (flipAxis !== null) {
@@ -130,26 +150,37 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
           absAxis >= 10;
 
         // 2. Same-direction re-swipe during an inertial momentum tail: only
-        // unlock when the previous tail has genuinely wound down (<= 6px), the
-        // cooldown has elapsed, and the new sample shows a sharp acceleration
-        // well above inertial quantization jitter.
+        // unlock when the CURRENT tail has genuinely wound down (previous sample
+        // <= 6px and smoothed EMA <= 10px), the cooldown has elapsed, and the new
+        // sample jumps well above both the recent EMA and the previous sample.
+        // Because `recentEmaAbs` and `prevAbsAxis` track current velocity up and
+        // down, an early dip before a strong flick cannot leave them latched low
+        // during high-velocity momentum.
         const spikedAfterDecay =
           sample.timeStamp - flipTime >= RE_SWIPE_COOLDOWN_MS &&
+          decayedTickCount >= 1 &&
           absAxis >= RE_SWIPE_MIN_DELTA_PX &&
-          tailMinAbs <= RE_SWIPE_MAX_DECAYED_TAIL_PX &&
-          absAxis >= Math.max(tailMinAbs, 1) * RE_SWIPE_SPIKE_RATIO &&
-          absAxis >= prevAbsAxis * 1.5;
+          prevAbsAxis <= RE_SWIPE_MAX_DECAYED_EMA_PX &&
+          recentEmaAbs <= 10 &&
+          absAxis >= Math.max(recentEmaAbs, 1) * 1.8 &&
+          absAxis >= Math.max(prevAbsAxis, 1) * RE_SWIPE_SPIKE_RATIO;
 
         if (switchedAxis || reversedDirection || spikedAfterDecay) {
           clearFlipLock();
+          lastTime = sample.timeStamp;
         } else {
           // Ignore 0-delta samples on the flipped axis (caused by a 1px cross-axis
-          // wobble frame) so they don't artificially drop tailMinAbs to 0.
-          if (absAxis > 0 && absAxis < tailMinAbs) {
-            tailMinAbs = absAxis;
-          }
+          // wobble frame) so they don't artificially decay the tracked tail.
           if (absAxis > 0) {
+            recentEmaAbs = Number.isFinite(recentEmaAbs)
+              ? recentEmaAbs * 0.5 + absAxis * 0.5
+              : absAxis;
             prevAbsAxis = absAxis;
+            if (absAxis <= RE_SWIPE_MAX_DECAYED_EMA_PX) {
+              decayedTickCount += 1;
+            } else {
+              decayedTickCount = 0;
+            }
           }
           return null;
         }
@@ -172,8 +203,9 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
     flipAxis = isHorizontal ? 'x' : 'y';
     flipSign = Math.sign(isHorizontal ? accumX : accumY);
     const initialAxisAbs = Math.abs(isHorizontal ? dx : dy);
-    tailMinAbs = initialAxisAbs > 0 ? initialAxisAbs : threshold;
-    prevAbsAxis = tailMinAbs;
+    recentEmaAbs = initialAxisAbs > 0 ? initialAxisAbs : threshold;
+    prevAbsAxis = recentEmaAbs;
+    decayedTickCount = 0;
 
     // Resolve to the dominant axis so a tiny amount of cross-axis noise
     // doesn't flip in the wrong direction.
