@@ -70,15 +70,42 @@ describe('createWheelGestureDetector', () => {
   test('recognizes a fresh same-direction swipe when velocity spikes after momentum decay', () => {
     const detector = createWheelGestureDetector({ threshold: 30, idleResetMs: 200 });
     expect(detector.feed(sample({ deltaX: 40, timeStamp: 0 }))).not.toBeNull();
-    // Momentum tail decays continuously without any 200ms idle gap.
-    expect(detector.feed(sample({ deltaX: 12, timeStamp: 50 }))).toBeNull();
-    expect(detector.feed(sample({ deltaX: 4, timeStamp: 120 }))).toBeNull();
-    expect(detector.feed(sample({ deltaX: 2, timeStamp: 180 }))).toBeNull();
+    // Momentum tail decays continuously without any 200ms gap.
+    expect(detector.feed(sample({ deltaX: 12, timeStamp: 80 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 4, timeStamp: 180 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 2, timeStamp: 250 }))).toBeNull();
     // User performs a second swipe while tail is still trickling (no 200ms gap):
-    expect(detector.feed(sample({ deltaX: 16, timeStamp: 220 }))).toBeNull();
-    const secondFlip = detector.feed(sample({ deltaX: 18, timeStamp: 236 }));
+    expect(detector.feed(sample({ deltaX: 20, timeStamp: 300 }))).toBeNull();
+    const secondFlip = detector.feed(sample({ deltaX: 20, timeStamp: 316 }));
     expect(secondFlip).not.toBeNull();
     expect(secondFlip!.deltaX).toBeGreaterThan(0);
+  });
+
+  test('does not double-flip on a single swipe with a noisy/jittery momentum tail', () => {
+    const detector = createWheelGestureDetector({ threshold: 30, idleResetMs: 200 });
+    // Initial finger swipe triggers the first page turn at t=32ms
+    expect(detector.feed(sample({ deltaX: 15, timeStamp: 0 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 20, timeStamp: 16 }))).not.toBeNull();
+    // Long trackpad momentum tail with non-monotonic jitter (e.g. 24 -> 18 -> 2 -> 0 -> 12 -> 10 -> 8 -> 6 -> 4)
+    const tail = [
+      { deltaX: 24, deltaY: 1, t: 32 },
+      { deltaX: 18, deltaY: 0, t: 48 },
+      { deltaX: 2, deltaY: 1, t: 64 }, // brief finger lift pause
+      { deltaX: 0, deltaY: 1, t: 80 }, // pure cross-axis wobble frame
+      { deltaX: 14, deltaY: 0, t: 96 }, // OS momentum kicks in
+      { deltaX: 12, deltaY: 0, t: 160 },
+      { deltaX: 9, deltaY: 0, t: 210 },
+      { deltaX: 11, deltaY: 0, t: 230 }, // quantization bounce in momentum tail
+      { deltaX: 8, deltaY: 0, t: 260 },
+      { deltaX: 9, deltaY: 0, t: 290 }, // jitter at 290ms
+      { deltaX: 5, deltaY: 0, t: 320 },
+      { deltaX: 3, deltaY: 0, t: 360 },
+    ];
+    for (const tick of tail) {
+      expect(
+        detector.feed(sample({ deltaX: tick.deltaX, deltaY: tick.deltaY, timeStamp: tick.t })),
+      ).toBeNull();
+    }
   });
 
   test('resolves to the dominant axis, ignoring cross-axis noise', () => {

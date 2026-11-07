@@ -46,12 +46,18 @@ const DEFAULT_PAGE_HEIGHT = 800;
 
 // Minimum cooldown (ms) after a flip before a velocity spike on the same axis
 // can be recognized as a fresh deliberate swipe interrupting the momentum tail.
-const RE_SWIPE_COOLDOWN_MS = 180;
+const RE_SWIPE_COOLDOWN_MS = 280;
 // Minimum normalized delta (px) for a sample to qualify as a re-swipe spike.
-const RE_SWIPE_MIN_DELTA_PX = 8;
+// Inertial momentum tails on macOS/Windows trackpads routinely jitter between
+// 0–8px per tick; requiring a strong acceleration above 18px prevents a single
+// swipe's momentum tail from triggering a second page turn.
+const RE_SWIPE_MIN_DELTA_PX = 18;
 // Factor by which the current sample must exceed the decayed tail minimum to
-// count as a fresh finger acceleration rather than inertial decay.
-const RE_SWIPE_SPIKE_RATIO = 1.8;
+// count as a fresh finger acceleration rather than inertial decay jitter.
+const RE_SWIPE_SPIKE_RATIO = 2.5;
+// Maximum decayed tail magnitude (px) before a same-direction spike can unlock;
+// ensures the previous swipe's active phase has genuinely wound down.
+const RE_SWIPE_MAX_DECAYED_TAIL_PX = 6;
 
 export const createWheelGestureDetector = (options: WheelGestureOptions = {}) => {
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
@@ -70,6 +76,7 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
   let flipAxis: 'x' | 'y' | null = null;
   let flipSign = 0;
   let tailMinAbs = Infinity;
+  let prevAbsAxis = Infinity;
 
   const normalize = (delta: number, mode: number) =>
     mode === 1 ? delta * lineHeight : mode === 2 ? delta * pageHeight : delta;
@@ -81,6 +88,7 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
     flipAxis = null;
     flipSign = 0;
     tailMinAbs = Infinity;
+    prevAbsAxis = Infinity;
   };
 
   /**
@@ -105,30 +113,43 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
         const absDominant = Math.abs(dominantDelta);
         const axisDelta = flipAxis === 'x' ? dx : dy;
         const absAxis = Math.abs(axisDelta);
+        const crossDelta = flipAxis === 'x' ? dy : dx;
+        const absCross = Math.abs(crossDelta);
 
-        // 1. Axis switch or opposite direction swipe immediately starts a new gesture.
-        const switchedAxis = dominantAxis !== flipAxis && absDominant >= RE_SWIPE_MIN_DELTA_PX;
+        // 1. Deliberate axis switch or opposite direction swipe starts a new gesture.
+        // Guard against cross-axis wobble (e.g. a 1px vertical tick while dx=0)
+        // and tiny bounce-back noise at the end of a gesture.
+        const switchedAxis =
+          dominantAxis !== flipAxis &&
+          absDominant >= RE_SWIPE_MIN_DELTA_PX &&
+          absCross > absAxis * 2;
         const reversedDirection =
           dominantAxis === flipAxis &&
           Math.sign(axisDelta) !== 0 &&
           Math.sign(axisDelta) !== flipSign &&
-          absAxis >= 4;
+          absAxis >= 10;
 
-        // 2. Same-direction re-swipe during an inertial momentum tail: once the
-        // tail has decayed and the user's fingers accelerate the trackpad again
-        // after a short cooldown, unlock so rapid consecutive swipes aren't
-        // swallowed by a 500–1000ms OS momentum tail.
+        // 2. Same-direction re-swipe during an inertial momentum tail: only
+        // unlock when the previous tail has genuinely wound down (<= 6px), the
+        // cooldown has elapsed, and the new sample shows a sharp acceleration
+        // well above inertial quantization jitter.
         const spikedAfterDecay =
           sample.timeStamp - flipTime >= RE_SWIPE_COOLDOWN_MS &&
           absAxis >= RE_SWIPE_MIN_DELTA_PX &&
-          tailMinAbs < Infinity &&
-          (tailMinAbs <= 2 || absAxis >= tailMinAbs * RE_SWIPE_SPIKE_RATIO);
+          tailMinAbs <= RE_SWIPE_MAX_DECAYED_TAIL_PX &&
+          absAxis >= Math.max(tailMinAbs, 1) * RE_SWIPE_SPIKE_RATIO &&
+          absAxis >= prevAbsAxis * 1.5;
 
         if (switchedAxis || reversedDirection || spikedAfterDecay) {
           clearFlipLock();
         } else {
-          if (absAxis < tailMinAbs) {
+          // Ignore 0-delta samples on the flipped axis (caused by a 1px cross-axis
+          // wobble frame) so they don't artificially drop tailMinAbs to 0.
+          if (absAxis > 0 && absAxis < tailMinAbs) {
             tailMinAbs = absAxis;
+          }
+          if (absAxis > 0) {
+            prevAbsAxis = absAxis;
           }
           return null;
         }
@@ -150,7 +171,9 @@ export const createWheelGestureDetector = (options: WheelGestureOptions = {}) =>
     flipTime = sample.timeStamp;
     flipAxis = isHorizontal ? 'x' : 'y';
     flipSign = Math.sign(isHorizontal ? accumX : accumY);
-    tailMinAbs = Math.abs(isHorizontal ? dx : dy);
+    const initialAxisAbs = Math.abs(isHorizontal ? dx : dy);
+    tailMinAbs = initialAxisAbs > 0 ? initialAxisAbs : threshold;
+    prevAbsAxis = tailMinAbs;
 
     // Resolve to the dominant axis so a tiny amount of cross-axis noise
     // doesn't flip in the wrong direction.
