@@ -14,6 +14,8 @@ jobs:
   build-android:
     name: Build Android APK (arm64)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     timeout-minutes: 90
 
     steps:
@@ -113,3 +115,14 @@ jobs:
           name: Readest-Android-arm64-apk
           path: apps/readest-app/build-output/Readest_arm64.apk
           if-no-files-found: error
+
+      - name: Publish APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create dev-latest \
+            --title "Readest Dev Latest" \
+            --notes "Latest development builds for Android (APK) and iOS/iPadOS (IPA)." \
+            --prerelease \
+            --target dev || true
+          gh release upload dev-latest apps/readest-app/build-output/Readest_arm64.apk --clobber

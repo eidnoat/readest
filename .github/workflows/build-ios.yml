@@ -7,6 +7,8 @@ jobs:
   build-ios:
     name: Build iOS and iPadOS IPA
     runs-on: macos-15
+    permissions:
+      contents: write
     timeout-minutes: 60
 
     steps:
@@ -101,3 +103,14 @@ jobs:
           name: Readest-iOS-iPadOS-ipa
           path: apps/readest-app/build-output/Readest.ipa
           if-no-files-found: error
+
+      - name: Publish IPA to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create dev-latest \
+            --title "Readest Dev Latest" \
+            --notes "Latest development builds for Android (APK) and iOS/iPadOS (IPA)." \
+            --prerelease \
+            --target dev || true
+          gh release upload dev-latest apps/readest-app/build-output/Readest.ipa --clobber
