@@ -456,7 +456,7 @@ pub async fn download_file<R: tauri::Runtime>(
                 let bytes = match resp.bytes().await {
                     Ok(b) => b,
                     Err(e) => {
-                        *download_error.lock().await = Some(Error::Network(e));
+                        *download_error.lock().await = Some(Error::Request(e));
                         return;
                     }
                 };
@@ -464,11 +464,11 @@ pub async fn download_file<R: tauri::Runtime>(
                 {
                     let mut f = file.lock().await;
                     if let Err(e) = f.seek(std::io::SeekFrom::Start(start)).await {
-                        *download_error.lock().await = Some(Error::IO(e));
+                        *download_error.lock().await = Some(Error::Io(e));
                         return;
                     }
                     if let Err(e) = f.write_all(&bytes).await {
-                        *download_error.lock().await = Some(Error::IO(e));
+                        *download_error.lock().await = Some(Error::Io(e));
                         return;
                     }
                 }

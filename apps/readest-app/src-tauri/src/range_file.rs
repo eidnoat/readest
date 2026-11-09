@@ -134,7 +134,7 @@ fn build_response<R: Runtime>(app: &AppHandle<R>, request: &Request<Vec<u8>>) ->
     // Security: identical boundary to the asset protocol — only paths the
     // importer/picker has granted (or application storage roots) are readable.
     if !app.asset_protocol_scope().is_allowed(&query.path)
-        && crate::transfer_file::ensure_path_allowed(app, &query.path).is_err()
+        && crate::transfer_file::ensure_path_allowed(app, &query.path.to_string_lossy()).is_err()
     {
         log::warn!(
             "rangefile: path not allowed by asset scope or app storage: {:?}",
