@@ -411,6 +411,7 @@ pub async fn download_file<R: tauri::Runtime>(
 
     let file = Arc::new(tokio::sync::Mutex::new(file));
     let progress = Arc::new(tokio::sync::Mutex::new(TransferStats::default()));
+    let download_error = Arc::new(tokio::sync::Mutex::new(None));
 
     stream::iter(0..part_count)
         .for_each_concurrent(8, |i| {
@@ -418,11 +419,16 @@ pub async fn download_file<R: tauri::Runtime>(
             let verified = verified.clone();
             let file = Arc::clone(&file);
             let progress = Arc::clone(&progress);
+            let download_error = Arc::clone(&download_error);
             let headers = headers.clone();
             let url = url.to_string();
             let on_progress = on_progress.clone();
 
             async move {
+                if download_error.lock().await.is_some() {
+                    return;
+                }
+
                 let start = i * PART_SIZE;
                 let end = min(start + PART_SIZE - 1, total - 1);
                 let range_header = format!("bytes={start}-{end}");
@@ -432,24 +438,39 @@ pub async fn download_file<R: tauri::Runtime>(
 
                 let resp = match send(&client, verified.as_ref(), &url, None, &headers).await {
                     Ok(r) => r,
-                    Err(_) => return,
+                    Err(e) => {
+                        *download_error.lock().await = Some(e);
+                        return;
+                    }
                 };
 
                 if !resp.status().is_success()
                     && resp.status() != reqwest::StatusCode::PARTIAL_CONTENT
                 {
+                    let status = resp.status().as_u16();
+                    let text = resp.text().await.unwrap_or_default();
+                    *download_error.lock().await = Some(Error::HttpErrorCode(status, text));
                     return;
                 }
 
                 let bytes = match resp.bytes().await {
                     Ok(b) => b,
-                    Err(_) => return,
+                    Err(e) => {
+                        *download_error.lock().await = Some(Error::Network(e));
+                        return;
+                    }
                 };
 
                 {
                     let mut f = file.lock().await;
-                    f.seek(std::io::SeekFrom::Start(start)).await.unwrap();
-                    f.write_all(&bytes).await.unwrap();
+                    if let Err(e) = f.seek(std::io::SeekFrom::Start(start)).await {
+                        *download_error.lock().await = Some(Error::IO(e));
+                        return;
+                    }
+                    if let Err(e) = f.write_all(&bytes).await {
+                        *download_error.lock().await = Some(Error::IO(e));
+                        return;
+                    }
                 }
 
                 {
@@ -464,6 +485,16 @@ pub async fn download_file<R: tauri::Runtime>(
             }
         })
         .await;
+
+    if let Some(err) = download_error.lock().await.take() {
+        let _ = tokio::fs::remove_file(file_path).await;
+        return Err(err);
+    }
+
+    {
+        let mut f = file.lock().await;
+        f.flush().await?;
+    }
 
     Ok(resp_headers)
 }

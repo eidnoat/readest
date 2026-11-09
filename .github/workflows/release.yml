@@ -9,6 +9,7 @@ permissions: read-all
 
 jobs:
   get-release:
+    if: github.event_name != 'release' || !github.event.release.prerelease
     permissions:
       contents: read
     runs-on: ubuntu-latest

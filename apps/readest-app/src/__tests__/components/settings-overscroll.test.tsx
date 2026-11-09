@@ -221,15 +221,18 @@ describe('Settings tab scrolling', () => {
     expect(screen.queryByTitle('TTS')).toBeNull();
     expect(screen.queryByTitle('Language')).not.toBeNull();
     expect(screen.queryByTitle('Integrations')).not.toBeNull();
+    expect(screen.queryByTitle('Custom')).not.toBeNull();
   });
 
-  it('includes all tabs when bookKey is provided', () => {
+  it('excludes library-only tabs (Language, Integrations, Custom) when bookKey is provided', () => {
     render(<SettingsDialog bookKey='book-1' />);
     expect(screen.queryByTitle('Font')).not.toBeNull();
     expect(screen.queryByTitle('Layout')).not.toBeNull();
     expect(screen.queryByTitle('Theme')).not.toBeNull();
     expect(screen.queryByTitle('Behavior')).not.toBeNull();
     expect(screen.queryByTitle('TTS')).not.toBeNull();
-    expect(screen.queryByTitle('Language')).not.toBeNull();
+    expect(screen.queryByTitle('Language')).toBeNull();
+    expect(screen.queryByTitle('Integrations')).toBeNull();
+    expect(screen.queryByTitle('Custom')).toBeNull();
   });
 });

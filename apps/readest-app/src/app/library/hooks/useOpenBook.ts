@@ -2,7 +2,6 @@ import { Dispatch, SetStateAction, useCallback } from 'react';
 import { Book } from '@/types/book';
 import { useEnv } from '@/context/EnvContext';
 import { useSettingsStore } from '@/store/settingsStore';
-import { useLibraryStore } from '@/store/libraryStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAppRouter } from '@/hooks/useAppRouter';
 import { hasFileSyncMirror, useMakeBookAvailable } from '@/hooks/useMakeBookAvailable';
@@ -34,12 +33,6 @@ export const useOpenBook = ({ setLoading, handleBookDownload }: UseOpenBookOptio
 
   const openBook = useCallback(
     async (book: Book, cfi?: string, options?: { highlightSearchResult?: boolean }) => {
-      const { getBookByHash, updateBookProgress } = useLibraryStore.getState();
-      const existing = getBookByHash(book.hash) ?? book;
-      const initialProgress: [number, number] = existing.progress ?? [1, existing.pageCount || 1];
-      const newStatus = existing.readingStatus === 'unread' ? undefined : existing.readingStatus;
-      updateBookProgress(existing.hash, initialProgress, newStatus);
-
       // A streaming audiobook has no local file and no document loader path -
       // it opens in the full-screen player instead of the reader. Short-circuit
       // before any of the file-availability logic below, which assumes a real

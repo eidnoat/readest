@@ -1,0 +1,381 @@
+name: Build Readest
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+          - macos
+
+jobs:
+  build-android:
+    name: Build Android APK (Phones & Tablets)
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'android'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;28.2.13676358"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-android-arm64-cargo
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline
+
+      - name: Setup vendor assets
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: Prepare Android project & signing keystore
+        env:
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd apps/readest-app
+          rm -rf src-tauri/gen/android
+          pnpm tauri android init
+          pnpm tauri icon ../../data/icons/readest-book.png
+          git checkout .
+
+          if [ -n "$ANDROID_KEY_BASE64" ]; then
+            echo "Using repository secret signing key"
+            echo "keyAlias=${ANDROID_KEY_ALIAS}" > src-tauri/gen/android/keystore.properties
+            echo "password=${ANDROID_KEY_PASSWORD}" >> src-tauri/gen/android/keystore.properties
+            base64 -d <<< "$ANDROID_KEY_BASE64" > "$RUNNER_TEMP/keystore.jks"
+            echo "storeFile=$RUNNER_TEMP/keystore.jks" >> src-tauri/gen/android/keystore.properties
+          else
+            echo "Using persistent fallback development keystore"
+            echo "keyAlias=readest" > src-tauri/gen/android/keystore.properties
+            echo "password=readest123" >> src-tauri/gen/android/keystore.properties
+            echo "storeFile=$PWD/distribution/dev.keystore" >> src-tauri/gen/android/keystore.properties
+          fi
+
+      - name: Build Android APK with Tauri
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: |
+          cd apps/readest-app
+          mkdir -p build-output
+          pnpm tauri android build -t aarch64
+
+          APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found APK: $APK_FILE"
+          if [ -z "$APK_FILE" ]; then
+            echo "Error: No APK file found!"
+            find src-tauri/gen/android/app/build/outputs || true
+            exit 1
+          fi
+          cp "$APK_FILE" build-output/Readest_arm64.apk
+          ls -lh build-output/Readest_arm64.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Readest-Android-arm64-apk
+          path: apps/readest-app/build-output/Readest_arm64.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view dev-latest &>/dev/null; then
+            gh release create dev-latest \
+              --title "Readest Dev Latest" \
+              --notes "Latest development builds for Android (APK), iOS/iPadOS (IPA), and macOS (DMG)." \
+              --prerelease \
+              --target dev || true
+          fi
+          for i in {1..3}; do
+            gh release upload dev-latest apps/readest-app/build-output/Readest_arm64.apk --clobber && break || sleep 5
+          done
+
+  build-ios:
+    name: Build iOS and iPadOS IPA
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'ios'
+    runs-on: macos-15
+    permissions:
+      contents: write
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)
+          fi
+          if [ -n "$XCODE_APP" ]; then
+            echo "Selecting $XCODE_APP"
+            sudo xcode-select -s "$XCODE_APP"
+          fi
+          xcodebuild -version
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-ios-arm64-cargo
+
+      - name: Link toolchain binaries for Xcode script phases
+        run: |
+          sudo ln -sf "$(which node)" /usr/local/bin/node || true
+          sudo ln -sf "$(which pnpm)" /usr/local/bin/pnpm || true
+          sudo ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo || true
+          sudo ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc || true
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline
+
+      - name: Setup vendor assets
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: Build Next.js frontend
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: |
+          cd apps/readest-app
+          pnpm build
+
+      - name: Build iOS App with Tauri
+        run: |
+          cd apps/readest-app
+          pnpm tauri ios build --no-sign
+
+      - name: Package IPA
+        run: |
+          cd apps/readest-app
+          mkdir -p build-output
+
+          if [ -f "src-tauri/gen/apple/build/arm64/Readest.ipa" ]; then
+            echo "Found Readest.ipa at src-tauri/gen/apple/build/arm64/Readest.ipa"
+            cp "src-tauri/gen/apple/build/arm64/Readest.ipa" build-output/Readest.ipa
+          else
+            APP_BUNDLE=$(find src-tauri/gen/apple/build -name "*.app" -type d | grep -E "Readest(_iOS)?\.app" | head -n 1)
+            if [ -z "$APP_BUNDLE" ]; then
+              APP_BUNDLE=$(find src-tauri/gen/apple/build -name "*.app" -type d | head -n 1)
+            fi
+            echo "Packaging app bundle: $APP_BUNDLE"
+            if [ -n "$APP_BUNDLE" ]; then
+              mkdir -p Payload
+              cp -R "$APP_BUNDLE" Payload/Readest.app
+              zip -qr build-output/Readest.ipa Payload
+              rm -rf Payload
+            else
+              echo "Error: No IPA or app bundle found!"
+              find src-tauri/gen/apple/build || true
+              exit 1
+            fi
+          fi
+
+          ls -lh build-output/Readest.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Readest-iOS-iPadOS-ipa
+          path: apps/readest-app/build-output/Readest.ipa
+          if-no-files-found: error
+
+      - name: Publish IPA to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view dev-latest &>/dev/null; then
+            gh release create dev-latest \
+              --title "Readest Dev Latest" \
+              --notes "Latest development builds for Android (APK), iOS/iPadOS (IPA), and macOS (DMG)." \
+              --prerelease \
+              --target dev || true
+          fi
+          for i in {1..3}; do
+            gh release upload dev-latest apps/readest-app/build-output/Readest.ipa --clobber && break || sleep 5
+          done
+
+  build-macos:
+    name: Build macOS Universal DMG & App
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
+    runs-on: macos-15
+    permissions:
+      contents: write
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode_16*.app" | sort -V | tail -n 1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP=$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)
+          fi
+          if [ -n "$XCODE_APP" ]; then
+            echo "Selecting $XCODE_APP"
+            sudo xcode-select -s "$XCODE_APP"
+          fi
+          xcodebuild -version
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-universal-cargo
+
+      - name: Link toolchain binaries
+        run: |
+          sudo ln -sf "$(which node)" /usr/local/bin/node || true
+          sudo ln -sf "$(which pnpm)" /usr/local/bin/pnpm || true
+          sudo ln -sf "$HOME/.cargo/bin/cargo" /usr/local/bin/cargo || true
+          sudo ln -sf "$HOME/.cargo/bin/rustc" /usr/local/bin/rustc || true
+
+      - name: Install dependencies
+        run: pnpm install --prefer-offline
+
+      - name: Setup vendor assets
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: Build macOS App and DMG with Tauri
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: |
+          cd apps/readest-app
+          mkdir -p build-output
+          pnpm tauri build --target universal-apple-darwin
+
+          DMG_FILE=$(find src-tauri/target/universal-apple-darwin/release/bundle/dmg -name "*.dmg" | head -n 1)
+          echo "Found DMG: $DMG_FILE"
+          if [ -z "$DMG_FILE" ]; then
+            echo "Error: No DMG file found!"
+            find src-tauri/target/universal-apple-darwin/release/bundle || true
+            exit 1
+          fi
+          cp "$DMG_FILE" build-output/Readest_macOS_universal.dmg
+          ls -lh build-output/Readest_macOS_universal.dmg
+
+          APP_DIR=$(find src-tauri/target/universal-apple-darwin/release/bundle/macos -name "*.app" -type d | head -n 1)
+          if [ -n "$APP_DIR" ]; then
+            echo "Packaging App bundle: $APP_DIR"
+            ditto -c -k --keepParent "$APP_DIR" build-output/Readest_macOS_universal.app.zip
+            ls -lh build-output/Readest_macOS_universal.app.zip
+          fi
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Readest-macOS-universal
+          path: |
+            apps/readest-app/build-output/Readest_macOS_universal.dmg
+            apps/readest-app/build-output/Readest_macOS_universal.app.zip
+          if-no-files-found: error
+
+      - name: Publish macOS to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view dev-latest &>/dev/null; then
+            gh release create dev-latest \
+              --title "Readest Dev Latest" \
+              --notes "Latest development builds for Android (APK), iOS/iPadOS (IPA), and macOS (DMG)." \
+              --prerelease \
+              --target dev || true
+          fi
+          for i in {1..3}; do
+            gh release upload dev-latest \
+              apps/readest-app/build-output/Readest_macOS_universal.dmg \
+              apps/readest-app/build-output/Readest_macOS_universal.app.zip \
+              --clobber && break || sleep 5
+          done

@@ -212,8 +212,13 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     try {
       const appService = await envConfig.getAppService();
       const { settings } = useSettingsStore.getState();
-      const { getBookByHash, library } = useLibraryStore.getState();
-      const book = getBookByHash(id);
+      const { getBookByHash, library, libraryLoaded } = useLibraryStore.getState();
+      let book = getBookByHash(id);
+      if (!book && !libraryLoaded) {
+        const loadedLibrary = await appService.loadLibraryBooks();
+        useLibraryStore.getState().setLibrary(loadedLibrary);
+        book = useLibraryStore.getState().getBookByHash(id);
+      }
       if (!book) {
         console.error(
           `Book ${id} not found in library (size=${library.length}); likely the in-memory entry was dropped by a library reload.`,
@@ -262,13 +267,36 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           // resolveNativeBookFilePath only reads `book` (it feeds the Rust
           // EPUB prefetch), so it can race the content load instead of
           // queueing behind it.
-          const [content, nativeFilePath] = await Promise.all([
-            appService.loadBookContent(book) as Promise<BookContent>,
-            appService.resolveNativeBookFilePath(book).catch((err: unknown) => {
-              console.warn('resolveNativeBookFilePath failed', err);
-              return null;
-            }),
-          ]);
+          let content: BookContent;
+          let nativeFilePath: string | null = null;
+          try {
+            [content, nativeFilePath] = await Promise.all([
+              appService.loadBookContent(book) as Promise<BookContent>,
+              appService.resolveNativeBookFilePath(book).catch((err: unknown) => {
+                console.warn('resolveNativeBookFilePath failed', err);
+                return null;
+              }),
+            ]);
+          } catch (err) {
+            const { getActiveFileSyncBackends } = await import('@/services/sync/cloudSyncProvider');
+            const hasCloudMirror =
+              !!book.uploadedAt || getActiveFileSyncBackends(settings).length > 0;
+            if (hasCloudMirror) {
+              const { runFileBookDownload } = await import('@/services/sync/file/runLibrarySync');
+              const ok = await runFileBookDownload(envConfig, book);
+              if (ok) {
+                await useLibraryStore.getState().updateBook(envConfig, book);
+                [content, nativeFilePath] = await Promise.all([
+                  appService.loadBookContent(book) as Promise<BookContent>,
+                  appService.resolveNativeBookFilePath(book).catch(() => null),
+                ]);
+              } else {
+                throw err;
+              }
+            } else {
+              throw err;
+            }
+          }
           file = content.file;
           const config = await configPromise;
           const doc = await new DocumentLoader(file, {

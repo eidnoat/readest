@@ -138,9 +138,12 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     },
   ] as TabConfig[];
 
+  const libraryOnlyTabs = new Set<SettingsPanelType>(['Language', 'Integrations', 'Custom']);
   const bookOnlyTabs = new Set<SettingsPanelType>(['Font', 'Layout', 'Theme', 'Control', 'TTS']);
 
-  const tabConfig = bookKey ? allTabs : allTabs.filter((tab) => !bookOnlyTabs.has(tab.tab));
+  const tabConfig = bookKey
+    ? allTabs.filter((tab) => !libraryOnlyTabs.has(tab.tab))
+    : allTabs.filter((tab) => !bookOnlyTabs.has(tab.tab));
 
   const [activePanel, setActivePanel] = useState<SettingsPanelType>(() => {
     // Deep-link: if a caller asked for a specific panel before opening the
