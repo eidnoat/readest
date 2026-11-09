@@ -269,7 +269,8 @@ jobs:
 
   build-macos:
     name: Build macOS Universal DMG & App
-    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
+    needs: build-ios
+    if: always() && !cancelled() && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos')
     runs-on: macos-15
     permissions:
       contents: write
