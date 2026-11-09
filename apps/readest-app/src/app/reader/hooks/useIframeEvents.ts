@@ -100,6 +100,7 @@ export const useMouseEvent = (
       const wheelEv = msg as unknown as React.WheelEvent<HTMLDivElement>;
       processWheelSample({
         bookKey,
+        timeStamp: Date.now(),
         ctrlKey: wheelEv.ctrlKey,
         deltaX: wheelEv.deltaX,
         deltaY: wheelEv.deltaY,

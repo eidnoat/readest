@@ -81,6 +81,35 @@ describe('createWheelGestureDetector', () => {
     expect(secondFlip!.deltaX).toBeGreaterThan(0);
   });
 
+  test('does not double-flip when main thread freezes during page turn render', () => {
+    const detector = createWheelGestureDetector(); // threshold=20, idleResetMs=140
+    // Initial swipe flips at t=16ms
+    expect(detector.feed(sample({ deltaX: 12, timeStamp: 0 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 15, timeStamp: 16 }))).not.toBeNull();
+    // Browser renders new page and drops frames for 160ms (> idleResetMs 140ms, but < cooldown 200ms)
+    // Buffered momentum ticks arrive after the freeze:
+    expect(detector.feed(sample({ deltaX: 14, timeStamp: 176 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 12, timeStamp: 192 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 8, timeStamp: 208 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 4, timeStamp: 224 }))).toBeNull();
+  });
+
+  test('successfully flips on natural gradual finger ramp-up after previous swipe decayed', () => {
+    const detector = createWheelGestureDetector(); // threshold=20, idleResetMs=140
+    // Swipe 1 flips at t=16ms
+    expect(detector.feed(sample({ deltaX: 25, timeStamp: 16 }))).not.toBeNull();
+    // Tail decays
+    expect(detector.feed(sample({ deltaX: 8, timeStamp: 70 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 3, timeStamp: 120 }))).toBeNull();
+    // User performs swipe 2 with gradual finger ramp-up (5 -> 8 -> 14 -> 18)
+    expect(detector.feed(sample({ deltaX: 5, timeStamp: 210 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 8, timeStamp: 226 }))).toBeNull();
+    expect(detector.feed(sample({ deltaX: 14, timeStamp: 242 }))).toBeNull();
+    const secondFlip = detector.feed(sample({ deltaX: 18, timeStamp: 258 }));
+    expect(secondFlip).not.toBeNull();
+    expect(secondFlip!.deltaX).toBeGreaterThan(0);
+  });
+
   test('does not double-flip on a single swipe with a noisy/jittery momentum tail', () => {
     const detector = createWheelGestureDetector({ threshold: 30, idleResetMs: 200 });
     // Initial finger swipe triggers the first page turn at t=16ms

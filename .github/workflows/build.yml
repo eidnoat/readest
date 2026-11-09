@@ -147,7 +147,7 @@ jobs:
   build-ios:
     name: Build iOS and iPadOS IPA
     if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'ios'
-    runs-on: macos-15
+    runs-on: macos-14
     permissions:
       contents: write
     timeout-minutes: 60
@@ -271,7 +271,7 @@ jobs:
     name: Build macOS Universal DMG & App
     needs: build-ios
     if: always() && !cancelled() && (github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos')
-    runs-on: macos-15
+    runs-on: macos-14
     permissions:
       contents: write
     timeout-minutes: 60
