@@ -1,4 +1,5 @@
 import { EDGE_TTS_PROTOCOL } from '@/libs/edgeTTS';
+import { isTauriAppPlatform } from '@/services/environment';
 import { AppService } from '@/types/system';
 import { BufferedTTSClient } from './BufferedTTSClient';
 import { createBookTTSCacheStore } from './providers/bookCacheStore';
@@ -40,9 +41,20 @@ export class EdgeTTSClient extends BufferedTTSClient {
       this.initialized = true;
       return true;
     }
+    if (
+      !isTauriAppPlatform() &&
+      this.controller?.isAuthenticated &&
+      (await this.#edgeProvider.init('https'))
+    ) {
+      this.initialized = true;
+      return true;
+    }
     if (this.provider instanceof CachingProvider) {
       this.initialized = true;
       return true;
+    }
+    if (!this.controller?.isAuthenticated) {
+      this.controller?.dispatchEvent(new CustomEvent('tts-need-auth'));
     }
     this.initialized = false;
     return false;

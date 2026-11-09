@@ -1,4 +1,5 @@
 import { EdgeSpeechTTS } from '@/libs/edgeTTS';
+import { isTauriAppPlatform } from '@/services/environment';
 import type { CustomTTSService } from '@/types/customTTS';
 import { NativeTTSClient } from './NativeTTSClient';
 import {
@@ -117,7 +118,12 @@ const playAudio = (data: ArrayBuffer, signal: AbortSignal, onStart: () => void) 
 
 const synthesizeEdge = async ({ voiceId, lang, text }: VoicePreview) => {
   const payload = { lang, text, voice: voiceId, rate: 1, pitch: 1 };
-  return (await new EdgeSpeechTTS('wss').createAudioData(payload)).data;
+  try {
+    return (await new EdgeSpeechTTS('wss').createAudioData(payload)).data;
+  } catch (error) {
+    if (isTauriAppPlatform()) throw error;
+    return (await new EdgeSpeechTTS('https').createAudioData(payload)).data;
+  }
 };
 
 // Held while speaking: Chrome may collect an utterance mid-speech and never

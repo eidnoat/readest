@@ -445,7 +445,13 @@ export class EdgeSpeechTTS {
   }
 
   async #fetchEdgeSpeechHttp({ lang, text, voice, rate }: EdgeTTSPayload): Promise<Response> {
-    const url = getAPIBaseUrl() + '/tts/edge';
+    const apiBase =
+      typeof window !== 'undefined' &&
+      !isTauriAppPlatform() &&
+      getAPIBaseUrl().startsWith('https://web.readest.com')
+        ? '/api'
+        : getAPIBaseUrl();
+    const url = apiBase + '/tts/edge';
 
     const response = await fetchWithAuth(url, {
       method: 'POST',

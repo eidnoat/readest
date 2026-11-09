@@ -171,5 +171,5 @@ export const getUserID = async (): Promise<string | null> => {
 export const validateUserAndToken = async (
   _authHeader: string | null | undefined,
 ): Promise<{ user?: { id: string; email?: string }; token?: string }> => {
-  return {};
+  return { user: { id: 'local-user', email: 'local@readest.app' }, token: 'local-token' };
 };
