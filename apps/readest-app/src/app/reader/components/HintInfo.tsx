@@ -1,7 +1,6 @@
 import clsx from 'clsx';
 import React, { useEffect, useRef } from 'react';
 import { Insets } from '@/types/misc';
-import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { eventDispatcher } from '@/utils/event';
 import { getHeaderBandGeometry, getMarginalInlinePadding } from '@/utils/insets';
@@ -30,12 +29,8 @@ const HintInfo: React.FC<SectionInfoProps> = ({
   gridInsets,
   columnGap = 0,
 }) => {
-  const { appService } = useEnv();
-  const { systemUIVisible, statusBarHeight, isIPhoneDuo } = useThemeStore();
-  const topInset = Math.max(
-    gridInsets.top,
-    appService?.isAndroidApp && systemUIVisible ? statusBarHeight / 2 : 0,
-  );
+  const { isIPhoneDuo } = useThemeStore();
+  const topInset = gridInsets.top;
   // The hint sits opposite the section title in the same header band, so it
   // follows the top margin exactly as SectionInfo does — a fixed 44px strip
   // dropped it below the title on any smaller margin.

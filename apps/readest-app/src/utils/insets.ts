@@ -55,12 +55,18 @@ export const getHeaderBandGeometry = (topInset: number, marginTopPx: number) => 
  * FoliateViewer.applyMarginAndGap, which floors at 16px via moreTopInset while
  * the page header is on and drops the safe-area inset when it is off.
  */
-export const getHeaderTriggerHeight = (topInset: number, viewSettings: ViewSettings) => {
+export const getHeaderTriggerHeight = (
+  topInset: number,
+  viewSettings: ViewSettings,
+  alwaysShowStatusBar = false,
+) => {
   const maxHeight = 44;
   const isVertical = viewSettings.vertical || viewSettings.writingMode.includes('vertical');
   const marginTopPx = getViewInsets(viewSettings).top;
   const contentTop =
-    viewSettings.showHeader && !isVertical ? Math.max(topInset + marginTopPx, 16) : marginTopPx;
+    (viewSettings.showHeader || alwaysShowStatusBar) && !isVertical
+      ? Math.max(topInset + marginTopPx, 16)
+      : marginTopPx;
   return Math.min(maxHeight, Math.max(0, contentTop));
 };
 

@@ -394,10 +394,16 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
     statusBarShownInsets,
     isIPhoneDuo,
     screenCornerRadius,
+    statusBarHeight,
   } = useThemeStore();
   const alwaysShowStatusBar = useSettingsStore((s) => s.settings.alwaysShowStatusBar);
   const aspectRatio = window.innerWidth / window.innerHeight;
   const gridTemplate = getGridTemplate(bookKeys.length, aspectRatio);
+
+  // On Android, safeAreaInsets only reflects displayCutout (to prevent layout
+  // shift when status bar toggles). When the status bar is visible, its height
+  // must be cleared.
+  const androidStatusBarTop = appService?.isAndroidApp && statusBarHeight > 0 ? statusBarHeight : 0;
 
   useEffect(() => {
     if (!sideBarBookKey) return;
@@ -420,19 +426,29 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
   // On iPhone Duo the toolbars keep the insets seen with the status bar shown:
   // the strip shows and hides with them, and its live inset lands a moment
   // after each, which would move them on every toggle.
-  const chromeScreenInsets = useMemo(
-    () =>
-      isIPhoneDuo && !alwaysShowStatusBar && screenInsets
+  const chromeScreenInsets = useMemo(() => {
+    if (!screenInsets) return null;
+    const insets =
+      isIPhoneDuo && !alwaysShowStatusBar
         ? getReadingScreenInsets(
             screenInsets,
             getRecordedScreenInsets(statusBarShownInsets, window.innerWidth, window.innerHeight),
             window.innerWidth,
             window.innerHeight,
           )
-        : screenInsets,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [screenInsets, statusBarShownInsets, isIPhoneDuo, alwaysShowStatusBar, aspectRatio],
-  );
+        : screenInsets;
+    if (androidStatusBarTop > 0) {
+      return { ...insets, top: Math.max(insets.top, androidStatusBarTop) };
+    }
+    return insets;
+  }, [
+    screenInsets,
+    statusBarShownInsets,
+    isIPhoneDuo,
+    alwaysShowStatusBar,
+    androidStatusBarTop,
+    aspectRatio,
+  ]);
   const perBookChromeInsets = useMemo<Insets[]>(
     () => getPerBookInsets(bookKeys, chromeScreenInsets, aspectRatio),
     // aspectRatio is recomputed every render but its value is window-derived
@@ -444,17 +460,24 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
   // status bar hidden, so showing the toolbar (and with it the status strip) does not
   // re-paginate. Elsewhere there is no record to apply: the page and the chrome
   // share the live insets.
+  // On Android, when alwaysShowStatusBar is true, the status bar is permanently
+  // visible while reading, so the reading page must clear it. When false, the
+  // status bar is hidden while reading, so the page lays out against screenInsets alone.
   const perBookGridInsets = useMemo<Insets[]>(() => {
+    if (!screenInsets) return [];
+    const insets =
+      isIPhoneDuo && !alwaysShowStatusBar
+        ? getReadingScreenInsets(
+            screenInsets,
+            getRecordedScreenInsets(statusBarHiddenInsets, window.innerWidth, window.innerHeight),
+            window.innerWidth,
+            window.innerHeight,
+          )
+        : screenInsets;
     const readingInsets =
-      screenInsets &&
-      getReadingScreenInsets(
-        screenInsets,
-        isIPhoneDuo && !alwaysShowStatusBar
-          ? getRecordedScreenInsets(statusBarHiddenInsets, window.innerWidth, window.innerHeight)
-          : null,
-        window.innerWidth,
-        window.innerHeight,
-      );
+      androidStatusBarTop > 0 && alwaysShowStatusBar
+        ? { ...insets, top: Math.max(insets.top, androidStatusBarTop) }
+        : insets;
     return getPerBookInsets(bookKeys, readingInsets, aspectRatio);
   }, [
     bookKeys,
@@ -462,6 +485,7 @@ const BooksGrid: React.FC<BooksGridProps> = ({ bookKeys, onCloseBook, onGoToLibr
     statusBarHiddenInsets,
     isIPhoneDuo,
     alwaysShowStatusBar,
+    androidStatusBarTop,
     aspectRatio,
   ]);
 

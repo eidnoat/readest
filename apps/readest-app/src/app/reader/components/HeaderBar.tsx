@@ -166,7 +166,10 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   const isHeaderVisible = hoveredBookKey === bookKey || isDropdownOpen;
   const isMobile = appService?.isMobile || window.innerWidth < 640;
   const forceMobileLayout = isForcedMobileLayout(appService?.isMobile, isIPhoneDuo);
-  const triggerHeight = viewSettings ? getHeaderTriggerHeight(gridInsets.top, viewSettings) : 0;
+  const alwaysShowStatusBar = useSettingsStore((s) => s.settings.alwaysShowStatusBar);
+  const triggerHeight = viewSettings
+    ? getHeaderTriggerHeight(gridInsets.top, viewSettings, alwaysShowStatusBar)
+    : 0;
 
   useSpatialNavigation(headerRef, isHeaderVisible);
   const trafficLightInHeader =

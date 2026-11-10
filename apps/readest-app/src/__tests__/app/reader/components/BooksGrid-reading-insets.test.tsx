@@ -11,9 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   setGridInsets: vi.fn(),
   alwaysShowStatusBar: false,
+  isAndroidApp: false,
 }));
 
-vi.mock('@/context/EnvContext', () => ({ useEnv: () => ({ appService: {} }) }));
+vi.mock('@/context/EnvContext', () => ({
+  useEnv: () => ({ appService: { isAndroidApp: h.isAndroidApp } }),
+}));
 vi.mock('@/hooks/useTranslation', () => ({ useTranslation: () => (key: string) => key }));
 vi.mock('@/store/settingsStore', () => ({
   useSettingsStore: (select: (state: { settings: { alwaysShowStatusBar: boolean } }) => unknown) =>
@@ -62,7 +65,9 @@ const live = { top: 0, right: 84, bottom: 34, left: 0 };
 beforeEach(() => {
   h.setGridInsets.mockClear();
   h.alwaysShowStatusBar = false;
+  h.isAndroidApp = false;
   useThemeStore.setState({
+    statusBarHeight: 24,
     safeAreaInsets: live,
     statusBarHiddenInsets: {
       [`${window.innerWidth}x${window.innerHeight}`]: {
@@ -99,5 +104,39 @@ describe('BooksGrid reading-page insets', () => {
     h.alwaysShowStatusBar = true;
     renderGrid();
     expect(h.setGridInsets).toHaveBeenLastCalledWith('book-1', live);
+  });
+
+  describe('Android insets', () => {
+    it('pads the reading page with statusBarHeight when Always Show Status Bar is on', () => {
+      h.isAndroidApp = true;
+      h.alwaysShowStatusBar = true;
+      useThemeStore.setState({
+        statusBarHeight: 36,
+        safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+      });
+      renderGrid();
+      expect(h.setGridInsets).toHaveBeenLastCalledWith('book-1', {
+        top: 36,
+        right: 0,
+        bottom: 0,
+        left: 0,
+      });
+    });
+
+    it('keeps screenInsets.top when Always Show Status Bar is off (status bar hidden during reading)', () => {
+      h.isAndroidApp = true;
+      h.alwaysShowStatusBar = false;
+      useThemeStore.setState({
+        statusBarHeight: 36,
+        safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+      });
+      renderGrid();
+      expect(h.setGridInsets).toHaveBeenLastCalledWith('book-1', {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+      });
+    });
   });
 });

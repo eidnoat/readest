@@ -48,14 +48,11 @@ const SectionInfo: React.FC<SectionInfoProps> = ({
   const _ = useTranslation();
   const { appService } = useEnv();
   const { hoveredBookKey, getView, getViewSettings, setHoveredBookKey } = useReaderStore();
-  const { systemUIVisible, statusBarHeight, isIPhoneDuo } = useThemeStore();
+  const { isIPhoneDuo } = useThemeStore();
   const getBookData = useBookDataStore((s) => s.getBookData);
   const viewSettings = getViewSettings(bookKey)!;
   const bookData = getBookData(bookKey);
-  const topInset = Math.max(
-    gridInsets.top,
-    appService?.isAndroidApp && systemUIVisible ? statusBarHeight / 2 : 0,
-  );
+  const topInset = gridInsets.top;
   // Negative top margins lift the band (and the scrolled-mode notch mask)
   // into the notch instead of collapsing it (#5303).
   const band = getHeaderBandGeometry(topInset, viewSettings.marginTopPx);
