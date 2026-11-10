@@ -335,19 +335,19 @@ jobs:
         run: |
           cd apps/readest-app
           mkdir -p build-output
-          pnpm tauri build --target universal-apple-darwin
+          pnpm tauri build --target universal-apple-darwin --no-sign --config '{"plugins":{"updater":{"pubkey":""}}}'
 
-          DMG_FILE=$(find src-tauri/target/universal-apple-darwin/release/bundle/dmg -name "*.dmg" | head -n 1)
+          DMG_FILE=$(find ../../target/universal-apple-darwin/release/bundle/dmg src-tauri/target/universal-apple-darwin/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -n 1)
           echo "Found DMG: $DMG_FILE"
           if [ -z "$DMG_FILE" ]; then
             echo "Error: No DMG file found!"
-            find src-tauri/target/universal-apple-darwin/release/bundle || true
+            find ../../target/universal-apple-darwin/release/bundle src-tauri/target/universal-apple-darwin/release/bundle 2>/dev/null || true
             exit 1
           fi
           cp "$DMG_FILE" build-output/Readest_macOS_universal.dmg
           ls -lh build-output/Readest_macOS_universal.dmg
 
-          APP_DIR=$(find src-tauri/target/universal-apple-darwin/release/bundle/macos -name "*.app" -type d | head -n 1)
+          APP_DIR=$(find ../../target/universal-apple-darwin/release/bundle/macos src-tauri/target/universal-apple-darwin/release/bundle/macos -name "*.app" -type d 2>/dev/null | head -n 1)
           if [ -n "$APP_DIR" ]; then
             echo "Packaging App bundle: $APP_DIR"
             ditto -c -k --keepParent "$APP_DIR" build-output/Readest_macOS_universal.app.zip
