@@ -59,7 +59,8 @@ describe('view settings defaults', () => {
     });
     expect(settings.defaultFontSize).toBe(22);
     expect(settings.marginTopPx).toBe(44);
-    expect(settings.marginBottomPx).toBe(44);
+    expect(settings.marginBottomPx).toBe(24);
+    expect(settings.compactMarginBottomPx).toBe(24);
     expect(settings.marginLeftPx).toBe(24);
     expect(settings.marginRightPx).toBe(24);
     expect(settings.compactMarginLeftPx).toBe(24);

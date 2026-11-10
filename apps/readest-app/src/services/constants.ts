@@ -359,7 +359,7 @@ export const DEFAULT_MOBILE_READSETTINGS: Partial<ReadSettings> = {
 };
 
 export const DEFAULT_BOOK_FONT: BookFont = {
-  serifFont: 'Bitter',
+  serifFont: 'LXGW WenKai GB Screen',
   sansSerifFont: 'Roboto',
   monospaceFont: 'Consolas',
   ignorePublisherFonts: [],
@@ -438,8 +438,8 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   userStylesheet: '',
   userUIStylesheet: '',
 
-  overrideFont: false,
-  overrideLayout: false,
+  overrideFont: true,
+  overrideLayout: true,
   overrideColor: false,
   useBookLayout: false,
 
@@ -455,12 +455,13 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
 export const DEFAULT_MOBILE_VIEW_SETTINGS: Partial<ViewSettings> = {
   fullJustification: false,
   animated: true,
-  defaultFont: 'Sans-serif',
+  defaultFont: 'Serif',
   disableDoubleClick: true,
   spreadMode: 'none',
   defaultFontSize: 22,
   marginTopPx: 44,
-  marginBottomPx: 44,
+  marginBottomPx: 24,
+  compactMarginBottomPx: 24,
   marginLeftPx: 24,
   marginRightPx: 24,
   compactMarginLeftPx: 24,
