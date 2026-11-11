@@ -1,5 +1,14 @@
 {
   "releases": {
+    "0.12.17": {
+      "date": "2026-11-11",
+      "notes": [
+        "Android: Fixed reading interface overlapping with system status bar",
+        "Settings: Set LXGW WenKai (霞鹜文楷) as default font, enabled font and layout override by default",
+        "Settings: Set mobile bottom margin to 24px by default, and disabled automatic update checking on startup",
+        "Paginator: Optimized consecutive rapid page-turn animation and responsiveness"
+      ]
+    },
     "0.12.16": {
       "date": "2026-10-14",
       "notes": [

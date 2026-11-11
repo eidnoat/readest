@@ -209,7 +209,7 @@ const ControlPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRes
       true,
     );
     if (appService?.hasUpdater) {
-      const { autoCheckUpdates = true, updateChannel = 'stable' } = DEFAULT_SYSTEM_SETTINGS;
+      const { autoCheckUpdates = false, updateChannel = 'stable' } = DEFAULT_SYSTEM_SETTINGS;
       saveSysSettings(envConfig, 'autoCheckUpdates', autoCheckUpdates);
       saveSysSettings(envConfig, 'updateChannel', updateChannel);
       setIsAutoCheckUpdates(autoCheckUpdates);
