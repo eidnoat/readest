@@ -135,7 +135,10 @@ async function handleRequest(request: NextRequest, method: 'GET' | 'HEAD') {
   const url = decodeURIComponent(encodedUrl);
   // Clients send the catalog credential as a request header; older clients
   // still put it in the `auth` query parameter.
-  const auth = request.headers.get('authorization') || request.nextUrl.searchParams.get('auth');
+  const auth =
+    request.headers.get('x-catalog-authorization') ||
+    request.headers.get('authorization') ||
+    request.nextUrl.searchParams.get('auth');
   const stream = request.nextUrl.searchParams.get('stream');
   const customHeaders = deserializeCustomHeaders(request.nextUrl.searchParams.get('headers'));
 
@@ -384,13 +387,18 @@ function isolateProxyResponse(response: NextResponse): NextResponse {
     'last-modified',
     'cache-control',
     'vary',
-    'www-authenticate',
+    'x-upstream-authenticate',
     'x-content-length',
     'access-control-allow-origin',
     'access-control-allow-methods',
     'access-control-allow-headers',
     'access-control-expose-headers',
   ]);
+  if (response.headers.has('www-authenticate')) {
+    const wwwAuth = response.headers.get('www-authenticate')!;
+    response.headers.delete('www-authenticate');
+    response.headers.set('x-upstream-authenticate', wwwAuth);
+  }
   for (const key of [...response.headers.keys()]) {
     if (!allowedHeaders.has(key)) response.headers.delete(key);
   }
