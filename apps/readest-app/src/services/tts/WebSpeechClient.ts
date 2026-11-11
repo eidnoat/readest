@@ -17,12 +17,8 @@ interface TTSBoundaryEvent {
   error?: string;
 }
 
-// Strong reference set to prevent V8/WebKit garbage-collecting active utterances mid-speech
-const activeUtterances = new Set<SpeechSynthesisUtterance>();
-
 async function* speakWithMarks(
   ssml: string,
-  signal: AbortSignal,
   primaryLang: string,
   getRate: () => number,
   getPitch: () => number,
@@ -33,109 +29,46 @@ async function* speakWithMarks(
 ) {
   const { marks } = parseSSMLMarks(ssml, primaryLang);
   const synth = window.speechSynthesis;
-
-  // Workaround for Chrome 14-second speech synthesis pause bug
-  let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
-  const startKeepAlive = () => {
-    if (keepAliveTimer) return;
-    keepAliveTimer = setInterval(() => {
-      if (synth && synth.speaking && !synth.paused) {
-        synth.pause();
-        synth.resume();
-      }
-    }, 10000);
-  };
-  const stopKeepAlive = () => {
-    if (keepAliveTimer) {
-      clearInterval(keepAliveTimer);
-      keepAliveTimer = null;
+  const utterance = new SpeechSynthesisUtterance();
+  for (const mark of marks) {
+    const { language: voiceLang } = mark;
+    dispatchSpeakMark(mark);
+    utterance.text = mark.text;
+    utterance.rate = getRate();
+    utterance.pitch = getPitch();
+    const voice = await getVoice(voiceLang);
+    if (voice) {
+      utterance.voice = voice;
+      setCurrentVoice(voice.voiceURI);
     }
-  };
-
-  try {
-    startKeepAlive();
-    for (const mark of marks) {
-      if (signal.aborted) {
-        synth.cancel();
-        break;
-      }
-      const { language: voiceLang } = mark;
-      dispatchSpeakMark(mark);
-
-      const utterance = new SpeechSynthesisUtterance();
-      activeUtterances.add(utterance);
-      utterance.text = mark.text;
-      utterance.rate = getRate();
-      utterance.pitch = getPitch();
-      const voice = await getVoice(voiceLang);
-      if (voice) {
-        utterance.voice = voice;
-        setCurrentVoice(voice.voiceURI);
-      }
-      if (voiceLang) {
-        utterance.lang = voiceLang;
-        setSpeakingLang(voiceLang);
-      }
-
-      yield {
-        type: 'boundary',
-        speaking: true,
-        name: 'sentence',
-        mark: mark.name,
-      } as TTSBoundaryEvent;
-
-      const result = await new Promise<TTSBoundaryEvent>((resolve) => {
-        let settled = false;
-        const cleanup = () => {
-          if (settled) return;
-          settled = true;
-          activeUtterances.delete(utterance);
-          signal.removeEventListener('abort', onAbort);
-        };
-
-        const onAbort = () => {
-          cleanup();
-          synth.cancel();
-          resolve({ type: 'end', speaking: false });
-        };
-
-        if (signal.aborted) {
-          onAbort();
-          return;
-        }
-
-        signal.addEventListener('abort', onAbort, { once: true });
-
-        utterance.onend = () => {
-          cleanup();
-          resolve({ type: 'end', speaking: false });
-        };
-
-        utterance.onerror = (event) => {
-          cleanup();
-          // In Web Speech API, 'interrupted' or 'canceled' occurs when speech is stopped or replaced,
-          // which is normal and should not be treated as a fatal failure.
-          if (event.error === 'interrupted' || event.error === 'canceled' || signal.aborted) {
-            resolve({ type: 'end', speaking: false });
-          } else {
-            resolve({
-              type: 'error',
-              speaking: false,
-              error: event.error,
-            });
-          }
-        };
-
-        synth.speak(utterance);
-      });
-
-      yield result;
-      if (result.type === 'error' || signal.aborted) {
-        break;
-      }
+    if (voiceLang) {
+      utterance.lang = voiceLang;
+      setSpeakingLang(voiceLang);
     }
-  } finally {
-    stopKeepAlive();
+
+    yield {
+      type: 'boundary',
+      speaking: true,
+      name: 'sentence',
+      mark: mark.name,
+    } as TTSBoundaryEvent;
+
+    const result = await new Promise<TTSBoundaryEvent>((resolve) => {
+      utterance.onend = () => resolve({ type: 'end', speaking: false });
+      utterance.onerror = (event) =>
+        resolve({
+          type: 'error',
+          speaking: false,
+          error: event.error,
+        });
+
+      synth.speak(utterance);
+    });
+
+    yield result;
+    if (result.type === 'error') {
+      break;
+    }
   }
 }
 
@@ -234,7 +167,6 @@ export class WebSpeechClient implements TTSClient {
 
     for await (const ev of speakWithMarks(
       ssml,
-      signal,
       this.#primaryLang,
       () => this.#rate,
       () => this.#pitch,
@@ -245,6 +177,7 @@ export class WebSpeechClient implements TTSClient {
     )) {
       if (signal.aborted) {
         console.log('TTS aborted');
+        yield { code: 'error', message: 'Aborted' } as TTSMessageEvent;
         return;
       }
       if (ev.type === 'boundary') {

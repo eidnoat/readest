@@ -41,15 +41,15 @@ export class EdgeTTSClient extends BufferedTTSClient {
       this.initialized = true;
       return true;
     }
-    const canUseHttpsProxy =
+    if (
       !isTauriAppPlatform() &&
-      (this.controller?.isAuthenticated ||
-        (typeof window !== 'undefined' && !window.location.hostname.endsWith('readest.com')));
-    if (canUseHttpsProxy && (await this.#edgeProvider.init('https'))) {
+      this.controller?.isAuthenticated &&
+      (await this.#edgeProvider.init('https'))
+    ) {
       this.initialized = true;
       return true;
     }
-    if (isTauriAppPlatform() && this.provider instanceof CachingProvider) {
+    if (this.provider instanceof CachingProvider) {
       this.initialized = true;
       return true;
     }
