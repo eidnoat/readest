@@ -403,6 +403,9 @@ function isolateProxyResponse(response: NextResponse): NextResponse {
     "sandbox; default-src 'none'; frame-ancestors 'none'",
   );
   response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, *');
   return response;
 }
 
@@ -420,7 +423,7 @@ export async function OPTIONS(_: NextRequest) {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, *',
     },
   });
 }
