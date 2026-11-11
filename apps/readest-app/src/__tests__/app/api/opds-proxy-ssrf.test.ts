@@ -142,6 +142,22 @@ describe('OPDS proxy trusted private hosts (#7105)', () => {
     expect((await GET(proxyReq('ftp://calibre.lan/opds'))).status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('allows private hosts when SELF_HOSTED is true', async () => {
+    vi.stubEnv('SELF_HOSTED', 'true');
+    fetchSpy.mockResolvedValueOnce(new Response('<feed/>'));
+    const res = await GET(proxyReq('http://192.168.1.100:8080/feed.php'));
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows private hosts when READEST_ALLOW_PRIVATE_HOSTS is true', async () => {
+    vi.stubEnv('READEST_ALLOW_PRIVATE_HOSTS', 'true');
+    fetchSpy.mockResolvedValueOnce(new Response('<feed/>'));
+    const res = await GET(proxyReq('http://192.168.1.100:8080/feed.php'));
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('OPDS proxy SSRF guard', () => {

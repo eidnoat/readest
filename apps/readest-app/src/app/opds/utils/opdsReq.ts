@@ -93,6 +93,9 @@ const getProxyBaseUrl = (url: string): string => {
       return proxyUrl;
     }
   }
+  if (typeof window !== 'undefined' && !isTauriAppPlatform()) {
+    return '/api/opds/proxy';
+  }
   return OPDS_PROXY_URL;
 };
 
