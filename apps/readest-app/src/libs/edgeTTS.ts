@@ -451,20 +451,36 @@ export class EdgeSpeechTTS {
       getAPIBaseUrl().startsWith('https://web.readest.com')
         ? '/api'
         : getAPIBaseUrl();
-    const url = apiBase + '/tts/edge';
+    const url = `${apiBase.replace(/\/$/, '')}/tts/edge`;
 
-    const response = await fetchWithAuth(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: text,
-        voice,
-        rate,
-        lang,
-      }),
+    const requestBody = JSON.stringify({
+      input: text,
+      voice,
+      rate,
+      lang,
     });
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    let response: Response;
+    try {
+      response = await fetchWithAuth(url, {
+        method: 'POST',
+        headers,
+        body: requestBody,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Not authenticated') {
+        response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: requestBody,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     if (!response.ok) {
       throw new Error(`Edge TTS HTTP request failed: ${response.status} ${response.statusText}`);
