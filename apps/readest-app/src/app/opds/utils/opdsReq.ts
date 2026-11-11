@@ -272,8 +272,7 @@ export const probeAuth = async (
 
   // Check if authentication is required
   if (res.status === 401 || res.status === 403) {
-    const wwwAuthenticate =
-      res.headers.get('WWW-Authenticate') || res.headers.get('X-Upstream-Authenticate');
+    const wwwAuthenticate = res.headers.get('WWW-Authenticate');
     if (wwwAuthenticate) {
       if (wwwAuthenticate.toLowerCase().startsWith('digest')) {
         const urlObj = new URL(cleanUrl);
@@ -381,12 +380,7 @@ export const fetchWithAuth = async (
   });
   const headers: Record<string, string> = {
     ...baseHeaders,
-    ...(preemptiveAuth
-      ? {
-          Authorization: preemptiveAuth,
-          'X-Catalog-Authorization': preemptiveAuth,
-        }
-      : {}),
+    ...(preemptiveAuth ? { Authorization: preemptiveAuth } : {}),
   };
 
   const fetch = isTauriAppPlatform() ? tauriFetch : window.fetch;
@@ -414,8 +408,7 @@ export const fetchWithAuth = async (
 
   // Handle authentication if needed
   if (!res.ok && (res.status === 401 || res.status === 403) && finalUsername && finalPassword) {
-    const wwwAuthenticate =
-      res.headers.get('WWW-Authenticate') || res.headers.get('X-Upstream-Authenticate');
+    const wwwAuthenticate = res.headers.get('WWW-Authenticate');
     if (wwwAuthenticate) {
       let authHeader: string | null = null;
 
